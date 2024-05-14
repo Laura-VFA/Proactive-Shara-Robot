@@ -3,7 +3,7 @@
 Shara is a **social 🗣 and affective ❤️ robot**. It is not only a passive assistant, but an active one: **proactive behaviour** is incorporated in the robot. It can start conversations and show concern about the user, making the interaction more natural and affective.  
 This repo contains the *brain* 🧠 structure of the robot, the proactive and interaction behavior themselves.
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/72492679/169651452-13529463-92b5-4fc1-bb0c-9b8303c46024.png" width="300"/>
+  <img src="https://github.com/Laura-VFA/Proactive-Shara-Robot/assets/72492679/f826a22d-2b77-4749-8d7a-2e6fe63aecf5" width="150"/>
 </p>
 
 ## Be different 😎
