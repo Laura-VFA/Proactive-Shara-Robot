@@ -23,7 +23,7 @@ class LedState:
             }
 
             if self.color is not None:
-                self.command["col"] = [self.color]
+                self.command["seg"][0]["col"] = [self.color]
         
             if self.brightness is not None:
                 self.command["bri"] =  self.brightness
