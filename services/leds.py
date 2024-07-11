@@ -1,5 +1,4 @@
 import logging
-import time
 import json
 import serial
 from dataclass import dataclass
@@ -10,6 +9,8 @@ from threading import Event, Lock, Thread
 class LedState:
     color: tuple
     fx: int = 0
+    sx: int = None
+    ix: int = None
     brightness: int = None
     command: dict = None
 
@@ -22,6 +23,12 @@ class LedState:
                     }],
             }
 
+            if self.sx is not None:
+                self.command["seg"][0]["sx"] = self.sx
+
+            if self.ix is not None:
+                self.command["seg"][0]["ix"] = self.ix
+
             if self.color is not None:
                 self.command["seg"][0]["col"] = [self.color]
         
@@ -31,10 +38,18 @@ class LedState:
     @classmethod
     def breath(cls, color):
         return cls(color, fx=2)
+
+    @classmethod
+    def loop(cls, color):
+        return cls(color, fx=41, sx=200)
     
     @classmethod
     def static_color(cls, color):
         return cls(color, fx=0)
+
+    @classmethod
+    def progress(cls, color, percentage):
+        return cls(color, fx=98, ix=percentage)
     
     @classmethod
     def rainbow(cls):
