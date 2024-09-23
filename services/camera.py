@@ -3,7 +3,8 @@ from threading import Lock
 
 import imutils
 import numpy as np
-import pyrealsense2.pyrealsense2 as rs
+
+from jetcam.csi_camera import CSICamera
 
 
 class Camera:
@@ -13,17 +14,35 @@ class Camera:
 
         self.active_services = set() # set of services using the camera
 
-        self.pipeline = rs.pipeline()
-        self.config = rs.config()
-        self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-
         self.lock = Lock()
 
+        self.cam_config = {
+            'width': 400,
+            'height': 300,
+            'capture_width': 1080, # change this resolution for modify eyefish effect
+            'capture_height': 720,
+            'capture_fps': 30, 
+            'flip_method': 2
+        }
+
+        self.camera = CSICamera(**self.cam_config)
+        self.camera.running = True
+        self.camera.observe(self._new_frame_callback, names='value')
+
+        self.frame = None
+        
         self.logger.info('Ready')
 
+    def _new_frame_callback(self, change):
+        with self.lock:
+            self.frame = change['new']
+
     def get_color_frame(self, resize_width: int = None):
-        frames = self.pipeline.wait_for_frames()
-        color_image = np.asanyarray(frames.get_color_frame().get_data())
+        with self.lock:
+            if self.frame is None:
+                return None
+            color_image = self.frame.copy()
+
         if resize_width:
             return imutils.resize(color_image, width=resize_width)
         return color_image
@@ -31,9 +50,12 @@ class Camera:
     def start(self, service):
         with self.lock: # exclusive access to set of services
             if not self.active_services:
-                self.pipeline.start(self.config)
-            
-            self.active_services.add(service)
+                self.camera.running = True
+                self.camera.observe(self._new_frame_callback, names='value')
+                pass
+
+            self.active_services.add(service)           
+
         
         self.logger.info(f'Service {service} enabled')
 
@@ -45,7 +67,11 @@ class Camera:
             self.active_services.discard(service)
 
             if not self.active_services:
-                self.pipeline.poll_for_frames() # clear last frame buffer
-                self.pipeline.stop()
+                self.close()
         
         self.logger.info(f'Service {service} disabled')
+
+    def close(self):
+        if self.camera.running:
+            self.camera.unobserve(self._new_frame_callback, names='value')
+            self.camera.running = False
