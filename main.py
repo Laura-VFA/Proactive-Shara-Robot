@@ -29,25 +29,6 @@ eva_context = { # Eva status & knowledge of the environment
 
 notifications = queue.Queue() # Transition state queue
 
-from fastapi import FastAPI
-
-app = FastAPI()
-
-lock = threading.Lock()
-
-# We can get and change the Eva's configuration from http request
-@app.get("/")
-async def get_configuration_for_http():
-    return {'notifications': list(notifications), 'context': eva_context}
-
-@app.post("/")
-async def change_configuration_from_http(state: str, context: dict):
-    notifications.put(state)
-    with lock:
-        eva_context.update(context)
-    return {"ok": True}
-
-
 listen_timer = None # Listening timeout handler
 DELAY_TIMEOUT = 5 # in sec
 
