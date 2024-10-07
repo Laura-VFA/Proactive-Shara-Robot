@@ -25,7 +25,7 @@ nlu_options = {
     },
     'language': "en"
 }
-nlu = NaturalLanguageUnderstandingV1(version='2021-08-01')
+nlu = NaturalLanguageUnderstandingV1(version='2022-04-07')
 
 
 
