@@ -1,7 +1,7 @@
 import logging
 import json
 import serial
-from dataclass import dataclass
+from dataclasses import dataclass
 from threading import Event, Lock, Thread
 
 
