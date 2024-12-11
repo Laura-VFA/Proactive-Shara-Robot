@@ -14,7 +14,7 @@ This repo contains the *brain* 🧠 structure of the robot, the proactive and in
 - 📷 [IMX219-160IR Camera](https://www.waveshare.com/wiki/IMX219-160IR_Camera) 
 - 🎤 [ReSpeaker Mic Array v2.0](https://wiki.seeedstudio.com/ReSpeaker_Mic_Array_v2.0/)
 - 🔊 [Speakers](https://www.waveshare.com/8ohm-5w-speaker.htm)
-- 🤖 [Raspberry Pi 5 8GB]([https://www.nvidia.com/es-es/autonomous-machines/embedded-systems/jetson-nano/product-development/](https://www.tiendatec.es/raspberry-pi/gama-raspberry-pi/2149-raspberry-pi-5-8gb-4gb-2gb-modelo-b.html))
+- 🤖 [Raspberry Pi 5 8GB](https://www.tiendatec.es/raspberry-pi/gama-raspberry-pi/2149-raspberry-pi-5-8gb-4gb-2gb-modelo-b.html)
 - [OTHER COMPONENTS WIP]
 - Plastic structure printed using 3D printer
 
