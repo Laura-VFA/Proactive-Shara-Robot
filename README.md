@@ -1,13 +1,9 @@
-# Proactive-Shara-Robot
-Shara: a social 🗣, affective ❤️ and proactive 🧠 robot for older adults 👴🏻 (now in Raspi 5!)
-
-
-# Shara-Assistant-Python
+# Shara Proactive Robot
 *THIS IS A SECOND VERSION OF THE [EVA ROBOT](https://github.com/Laura-VFA/Affective-Proactive-EVA-Robot)*.  
 Shara is a **social 🗣 and affective ❤️ robot**. It is not only a passive assistant, but an active one: **proactive behaviour** is incorporated in the robot. It can start conversations and show concern about the user, making the interaction more natural and affective.  
 This repo contains the *brain* 🧠 structure of the robot, the proactive and interaction behavior themselves.
 <p align="center">
-  ![shara_joy](https://github.com/user-attachments/assets/c75e91e5-f55c-495d-9bf2-a27a5b9c5645)
+  <img src="https://github.com/Laura-VFA/Proactive-Shara-Robot/assets/72492679/f826a22d-2b77-4749-8d7a-2e6fe63aecf5" width="150"/>
 </p>
 
 ## Be different 😎
