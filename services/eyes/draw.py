@@ -68,6 +68,17 @@ def draw_face(face_points, width=1080, height=1920):
             g_eye_center[0]- eye_axes[0] - reg_offset[1]: g_eye_center[0]+ eye_axes[0] + reg_offset[0]
         ])
 
+    if 'blush' in face_points:
+        g_left_eye_center = face_points['eyes']['left']['center']
+        g_right_eye_center = face_points['eyes']['right']['center']
+        left_blush_center = np.array([g_left_eye_center[0]//2, g_left_eye_center[1] + width//3])
+        right_blush_center = np.array([g_right_eye_center[0] + left_blush_center[0], left_blush_center[1]])
+        blush_axes = np.array([eye_axes[0], eye_axes[1]//2])
+
+        # Draw the blush in a pinky color
+        cv2.ellipse(canvas, left_blush_center, blush_axes, 0, 0, 360, [246, 195, 255], cv2.FILLED, lineType=cv2.LINE_AA)
+        cv2.ellipse(canvas, right_blush_center, blush_axes, 0, 0, 360, [246, 195, 255], cv2.FILLED, lineType=cv2.LINE_AA)
+
     return canvas
 
 def draw_face_from_file(filename: str):  
