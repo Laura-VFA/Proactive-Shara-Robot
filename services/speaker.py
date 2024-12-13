@@ -1,25 +1,11 @@
 import logging
-from contextlib import contextmanager
-from ctypes import CFUNCTYPE, c_char_p, c_int, cdll
 from threading import Thread
 
-import pyaudio
+import simpleaudio as sa
 
-
-@contextmanager
-def supress_alsa_warnings():
-    asound = cdll.LoadLibrary('libasound.so')
-    asound.snd_lib_error_set_handler(
-        CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int, c_char_p)(
-            lambda filename, line, function, err, fmt: None
-        )
-    )
-    yield
-    asound.snd_lib_error_set_handler(None)
 
 class Speaker:
-    def __init__(self, callback, chunk_size=2048,
-                 format=pyaudio.paInt16, channels=1, rate=24000):
+    def __init__(self, callback, chunk_size=2048, channels=1, sample_width=2, rate = 24000):
         self.logger = logging.getLogger('Speaker')
         self.logger.setLevel(logging.DEBUG)
 
@@ -27,12 +13,10 @@ class Speaker:
         self.format = format
         self.channels = channels
         self.rate = rate  
+        self.sample_width=sample_width
 
         self.callback = callback
         self._thread = None
-
-        with supress_alsa_warnings():
-            self.p = pyaudio.PyAudio() # Create an interface to PortAudio
 
         self.logger.info('Ready')
     
@@ -43,15 +27,10 @@ class Speaker:
     def play(self, audio):
         self.logger.info('Playing audio')
 
-        stream = self.p.open(format = self.format,
-                        channels = self.channels,
-                        rate = self.rate,
-                        output = True,
-                        output_device_index=1
-                        )
+        audio_object = sa.WaveObject(audio, self.channels, self.sample_width, self.rate)
 
-        stream.write(audio)
-        stream.close()
+        play_object = audio_object.play()
+        play_object.wait_done()
 
         self.logger.info('Playing done')
         self.callback('finish_speak')
@@ -59,7 +38,5 @@ class Speaker:
     def destroy(self):
         if self._thread is not None and self._thread.is_alive():
             self._thread.join()
-
-        self.p.terminate()
 
         self.logger.info('Stopped')
