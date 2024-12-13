@@ -18,9 +18,6 @@ class Eyes():
         self.logger = logging.getLogger('Eyes')
         self.logger.setLevel(logging.DEBUG)
 
-        cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty("window",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
-
         self.faces_dir = Path(faces_dir)
         self.face_cache = Path(face_cache)
         self.screen_width = sc_width
@@ -61,6 +58,11 @@ class Eyes():
             self._set(face)
 
     def _run(self):
+
+        # Initialize the windows
+        cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty("window",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+
         next_blink = time.time() + random.randint(4,7) # Time of blink
 
         while not self.stopped.is_set():
@@ -91,7 +93,7 @@ class Eyes():
                     break    
                 pass
 
-        cv2.destroyAllWindows()      
+        cv2.destroyAllWindows()
         
     def start(self):
         self.thread = Thread(target = self._run)
