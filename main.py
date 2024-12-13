@@ -503,7 +503,7 @@ def process_transition(transition, params={}):
 if __name__ == '__main__':
     
     leds = MatrixLed()
-    eyes = Eyes()
+    eyes = Eyes(sc_width=600, sc_height=1024)
     FaceDB.load() # load face embeddings
     ProactivePhrases.load()
 
