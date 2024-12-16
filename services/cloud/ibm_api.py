@@ -69,7 +69,8 @@ def generate_response(input_text, context_data={}):
                     "user_defined": context_data
                 }
             }
-        }
+        },
+        environment_id='_'
     ).get_result()
 
     last_query_time = datetime.now()
