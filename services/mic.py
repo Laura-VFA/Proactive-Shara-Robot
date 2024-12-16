@@ -76,7 +76,7 @@ class Recorder:
                 rate=self.rate,
                 input=True,
                 frames_per_buffer=self.chunk_size,
-                input_device_index=3,
+                input_device_index=1,
                 stream_callback=self.on_data)
         
         self._thread = Thread(target=self._run)
