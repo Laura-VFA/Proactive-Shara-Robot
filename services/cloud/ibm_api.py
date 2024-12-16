@@ -14,7 +14,7 @@ with open(os.environ.get('WATSON_ASSISTANT_CREDENTIALS')) as json_file:
 SESSION_TIME = 20 # in seconds
 last_query_time = None
 session_id = ''
-assistant = AssistantV2(version='2021-06-14')
+assistant = AssistantV2(version='2024-08-25')
 
 
 # NLU Emotion Analysis
@@ -25,7 +25,7 @@ nlu_options = {
     },
     'language': "en"
 }
-nlu = NaturalLanguageUnderstandingV1(version='2021-08-01')
+nlu = NaturalLanguageUnderstandingV1(version='2022-04-07')
 
 
 
