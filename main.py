@@ -8,7 +8,7 @@ from services.camera_services import (FaceDB, PresenceDetector, RecordFace,
 from services.cloud import server
 from services.cloud.telegram import TelegramService
 from services.eyes.service import Eyes
-from services.leds import *
+from services.leds import ArrayLed, LedState
 from services.mic import Recorder
 from services.proactive_service import ProactivePhrases, ProactiveService
 from services.speaker import Speaker
@@ -158,20 +158,20 @@ def process_transition(transition, params={}):
     # User presence detected in the room
     if transition == 'idle2idle_presence' and eva_context['state'] == 'idle':
         eva_context['state'] = 'idle_presence'
-        leds.set(StaticColor('purple'))
+        leds.set(LedState.static_color((186,85,211))) # set static purple color 
         wf.start()
     
     # User left the room
     elif transition == 'idle_presence2idle' and eva_context['state'] == 'idle_presence':
         eva_context['state'] = 'idle'
         eva_context['username'] = None
-        leds.set(StaticColor('black'))
+        leds.set(LedState.static_color((0,0,0))) # set static black color
         wf.stop()
 
     # User looking at the robot
     elif transition == 'idle_presence2listening' and eva_context['state'] == 'idle_presence':
         eva_context['state'] = 'listening'
-        leds.set(Loop('b'))
+        leds.set(LedState.loop((52,158,235))) # set light blue loop color
         pd.stop()
         mic.start()
 
@@ -179,14 +179,14 @@ def process_transition(transition, params={}):
     elif transition == 'listening2idle_presence' and eva_context['state'] == 'listening':
         eva_context['state'] = 'idle_presence'
         eva_context['username'] = None
-        leds.set(StaticColor('black'))
+        leds.set(LedState.static_color((0,0,0))) # set static black color
         mic.stop()
         pd.start()
 
     # User looking at the robot starts talking
     elif transition == 'listening2recording' and eva_context['state'] == 'listening':
         eva_context['state'] = 'recording'
-        leds.set(Loop('w'))
+        leds.set(LedState.loop((255,255,255))) # set white loop color
         wf.stop()
         try:
             server.prepare() # Create session in advance if necessary
@@ -196,7 +196,7 @@ def process_transition(transition, params={}):
     # User in conversation starts talking
     elif transition == 'listening_without_cam2recording' and eva_context['state'] == 'listening_without_cam':
         eva_context['state'] = 'recording'
-        leds.set(Loop('w'))
+        leds.set(LedState.loop((255,255,255))) # set white loop color
         listen_timer.cancel()
         try:
             server.prepare() # Create session in advance if necessary
@@ -206,7 +206,7 @@ def process_transition(transition, params={}):
     # User finished talking: sending audio to server
     elif transition == 'recording2processingquery' and eva_context['state'] == 'recording':
         eva_context['state'] = 'processing_query'
-        leds.set(StaticColor('black'))
+        leds.set(LedState.static_color((0,0,0)))
         mic.stop()
 
         audio = params['audio']
@@ -226,7 +226,7 @@ def process_transition(transition, params={}):
             eva_context['proactive_question'] = ''
             eva_context['state'] = 'speaking'
             eva_context['tg_destination_name'] = ''
-            leds.set(Breath('r'))
+            leds.set(LedState.breath((255,0,0))) # set breath red animation
             speaker.start(connection_error_audio)
         else:
             if response:
@@ -255,7 +255,7 @@ def process_transition(transition, params={}):
                 # Reproduce response                
                 eva_context['state'] = 'speaking'
                 eyes.set(response.eva_mood)
-                leds.set(Breath('b'))
+                leds.set(LedState.breath((52,158,235))) # light blue breath
                 speaker.start(response.audio)
 
             elif eva_context['continue_conversation']: # Avoid end the conversation due to noises
@@ -263,7 +263,7 @@ def process_transition(transition, params={}):
                 logger.info(f'Handling transition processing_query2listening_without_cam')
 
                 eva_context['state'] = 'listening_without_cam'
-                leds.set(Loop('b'))
+                leds.set(LedState.loop((52,158,235))) # light blue loop
                 mic.start()
 
                 # Add a timeout to execute a transition function due to inactivity
@@ -279,14 +279,14 @@ def process_transition(transition, params={}):
                 eva_context['proactive_question'] = ''
                 eva_context['tg_destination_name'] = ''                
                 eyes.set('neutral')
-                leds.set(StaticColor('black'))
+                leds.set(LedState.static_color((0,0,0))) # put black static color
                 pd.start()
                 wf.start()
 
     # Continue conversation after robot speaks: waiting for user audio
     elif transition == 'speaking2listening_without_cam' and eva_context['state'] == 'speaking':
         eva_context['state'] = 'listening_without_cam'
-        leds.set(Loop('b'))
+        leds.set(LedState.loop((52,158,235))) # light blue color
         mic.start()
 
         # Add a timeout to execute a transition funcion due to inactivity
@@ -301,7 +301,7 @@ def process_transition(transition, params={}):
         eva_context['tg_destination_name'] = ''
         eva_context['continue_conversation'] = False
         eyes.set('neutral')
-        leds.set(StaticColor('black'))
+        leds.set(LedState.static_color((0,0,0))) # put black static color
         rf.stop()
         pd.start()
         wf.start()
@@ -313,7 +313,7 @@ def process_transition(transition, params={}):
         eva_context['proactive_question'] =  ''
         eva_context['tg_destination_name'] = ''
         eyes.set('neutral')
-        leds.set(Close('blue'))
+        leds.set(LedState.static_color((0,0,0))) # put black static color
         mic.stop()
         rf.stop()
         pd.start()
@@ -327,7 +327,7 @@ def process_transition(transition, params={}):
         if params['question'] == 'how_are_you':
             if eva_context['state'] == 'idle_presence':
                 eva_context['state'] = 'processing_query'
-                leds.set(StaticColor('black'))
+                leds.set(LedState.static_color((0,0,0))) # put black static color
 
                 # Interrupt services
                 wf.stop()
@@ -341,7 +341,7 @@ def process_transition(transition, params={}):
                     eva_context['continue_conversation'] = False
                     eva_context['proactive_question'] = ''
                     eva_context['state'] = 'speaking'
-                    leds.set(Breath('r'))
+                    leds.set(LedState.breath((255,0,0))) # red breath animation
                     speaker.start(connection_error_audio)
 
                     proactive.update('abort', 'how_are_you')
@@ -350,7 +350,7 @@ def process_transition(transition, params={}):
                     eva_context['proactive_question'] = 'how_are_you'
                     eva_context['continue_conversation'] = True
                     eva_context['state'] = 'speaking'
-                    leds.set(Breath('b'))
+                    leds.set(LedState.breath((52,158,235))) # light blue led breath animation
                     speaker.start(audio_response)
                     try:
                         server.prepare() # Create session in advance if necessary
@@ -365,7 +365,7 @@ def process_transition(transition, params={}):
         elif params['question'] == 'who_are_you':
             if eva_context['state'] == 'listening':
                 eva_context['state'] = 'processing_query'
-                leds.set(StaticColor('black'))
+                leds.set(LedState.static_color((0,0,0))) # set static black color
 
                 # Interrupt services
                 mic.stop()
@@ -379,7 +379,7 @@ def process_transition(transition, params={}):
                     eva_context['continue_conversation'] = False
                     eva_context['proactive_question'] = ''
                     eva_context['state'] = 'speaking'
-                    leds.set(Breath('r'))
+                    leds.set(LedState.breath((255,0,0))) # red breath animation
                     speaker.start(connection_error_audio)
 
                     proactive.update('abort', 'who_are_you')
@@ -387,7 +387,7 @@ def process_transition(transition, params={}):
                     eva_context['proactive_question'] = 'who_are_you'
                     eva_context['continue_conversation'] = True
                     eva_context['state'] = 'speaking'
-                    leds.set(Breath('b'))
+                    leds.set(LedState.breath((52,158,235))) # light blue led breath animation
                     speaker.start(audio_response)
                     try:
                         server.prepare() # Create session in advance if necessary
@@ -401,7 +401,7 @@ def process_transition(transition, params={}):
         elif params['question'] == 'read_pending_messages':
             if eva_context['state'] in ['listening', 'idle_presence']: # Check if it's a good moment to read the messages
                 eva_context['state'] = 'processing_query'
-                leds.set(StaticColor('black'))
+                leds.set(LedState.static_color((0,0,0))) # set static black color
 
                 # Interrupt services
                 if eva_context['state'] == 'listening': mic.stop()
@@ -430,14 +430,14 @@ def process_transition(transition, params={}):
                     eva_context['continue_conversation'] = False
                     eva_context['proactive_question'] = ''
                     eva_context['state'] = 'speaking'
-                    leds.set(Breath('r'))
+                    leds.set(LedState.breath((255,0,0))) # red breath animation
                     speaker.start(connection_error_audio)
 
                     proactive.update('abort', 'read_pending_messages')
                 else:
                     eva_context['continue_conversation'] = False
                     eva_context['state'] = 'speaking'
-                    leds.set(Breath('g'))
+                    leds.set(LedState.breath((0,255,0))) # green breath animation
                     speaker.start(audio_response)
 
                     proactive.update('confirm', 'read_pending_messages')
@@ -448,22 +448,22 @@ def process_transition(transition, params={}):
     elif transition == 'recording_face':
         logger.info(f"Recording progress: {params['progress']:.2f}; Current state: {eva_context['state']}")
 
-        leds.set(Progress(percentage=params['progress']))
+        leds.set(LedState.progress((0,255,0), percentage=params['progress'])) # percentage leds in green color
 
         if params['progress'] == 100: # Recording completed
             rf.stop()
             if eva_context['state'] in ['listening_without_cam', 'listening']:
-                leds.set(Loop('b'))
+                leds.set(LedState.loop((52,158,235))) # light loop blue animation
             elif eva_context['state'] == 'recording':
-                leds.set(Loop('w'))
+                leds.set(LedState.loop((255,255,255))) # white loop animation
             else:
-                leds.set(StaticColor('black'))
+                leds.set(LedState.static_color((0,0,0))) # static black color
 
     # Handle incoming telegram message
     elif transition == 'received_tg_message':
         if eva_context['state'] in ['idle_presence', 'listening']: # Message can be read right now
             eva_context['state'] = 'processing_query'
-            leds.set(StaticColor('black'))
+            leds.set(LedState.static_color((0,0,0))) # static black color
 
             # Interrupt services
             if eva_context['state'] == 'listening': mic.stop()
@@ -482,13 +482,13 @@ def process_transition(transition, params={}):
                 eva_context['continue_conversation'] = False
                 eva_context['proactive_question'] = ''
                 eva_context['state'] = 'speaking'
-                leds.set(Breath('r'))
+                leds.set(LedState.breath((255,0,0))) # red breath led animation
                 speaker.start(connection_error_audio)
 
             else:
                 eva_context['continue_conversation'] = False
                 eva_context['state'] = 'speaking'
-                leds.set(Breath('g'))
+                leds.set(LedState.breath((0,255,0))) # green breath led animation
                 speaker.start(audio_response)
         
         else:
@@ -502,7 +502,7 @@ def process_transition(transition, params={}):
 
 if __name__ == '__main__':
     
-    leds = MatrixLed()
+    leds = ArrayLed()
     eyes = Eyes(sc_width=600, sc_height=1024)
     FaceDB.load() # load face embeddings
     ProactivePhrases.load()
