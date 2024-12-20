@@ -13,8 +13,7 @@ from PIL import Image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 from .camera import Camera
-from .presence_detector.object_detector import (ObjectDetector,
-                                                ObjectDetectorOptions)
+from .presence_detector.object_detector import ObjectDetector
 
 
 class FaceDB:
@@ -353,46 +352,25 @@ class RecordFace(CameraService):
 
         
 class PresenceDetector(CameraService):
-    '''
-    Based on:
-
-    Copyright 2021 The TensorFlow Authors. All Rights Reserved.
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-    '''
-
-    def __init__(self, callback, model='./services/presence_detector/efficientdet_lite0.tflite', 
+    def __init__(self, callback, model_path='./SHARA/services/presence_detector/efficientdet_lite1.tflite', 
                     num_threads=1) -> None:
-
         super().__init__()
 
         self.callback = callback
         self.stopped = Event()
         self._thread = None
 
-          # Initialize the object detection model
-        options = ObjectDetectorOptions(
-            num_threads=num_threads,
-            score_threshold=0.3,
-            max_results=3,
-            label_allow_list = ['person']
+        # Initialize the object detection model
+        self.detector = ObjectDetector(
+            model_path = model_path,
+            num_threads = num_threads,
+            score_threshold = 0.3,
+            objects_to_detect_id= [0] # 0 id means 'person'
         )
-        self.detector = ObjectDetector(model_path=model, options=options)
 
         self.logger.info('Ready')
     
     def start(self):
-
         self.stopped.clear()
         self._thread = Thread(target=self._run)
         self._thread.start()
