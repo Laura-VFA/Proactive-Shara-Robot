@@ -76,7 +76,7 @@ class Recorder:
                 rate=self.rate,
                 input=True,
                 frames_per_buffer=self.chunk_size,
-                input_device_index=1,
+                input_device_index=0, # remember to check which index device is Respeaker
                 stream_callback=self.on_data)
         
         self._thread = Thread(target=self._run)
