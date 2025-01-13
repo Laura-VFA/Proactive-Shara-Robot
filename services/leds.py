@@ -82,6 +82,8 @@ class ArrayLed:
     def _run(self):
         self.logger.info('Started')
         with serial.Serial(self.port, 115200, timeout=1) as s:
+            s.write(f'{json.dumps({"on": True})}\n'.encode()) # Turn on leds for first time
+
             while not self.stopped.is_set():
                 if not self.state_changed.wait(1):
                     continue
