@@ -352,7 +352,7 @@ class RecordFace(CameraService):
 
         
 class PresenceDetector(CameraService):
-    def __init__(self, callback, model_path='./SHARA/services/presence_detector/efficientdet_lite1.tflite', 
+    def __init__(self, callback, model_path='services/presence_detector/efficientdet_lite1.tflite', 
                     num_threads=1) -> None:
         super().__init__()
 
