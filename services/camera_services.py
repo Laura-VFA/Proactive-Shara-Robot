@@ -397,7 +397,7 @@ class PresenceDetector(CameraService):
             if detections:
                 self.detection_count += 1
 
-                if self.detection_count == 3: # 3 consecutive frames with presence detected
+                if self.detection_count >= 3: # 3 consecutive frames with presence detected
                     self.callback('person_detected')
                     self.detection_count = 0 # Reset counter
 
