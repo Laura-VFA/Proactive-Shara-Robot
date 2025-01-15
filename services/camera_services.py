@@ -360,6 +360,8 @@ class PresenceDetector(CameraService):
         self.stopped = Event()
         self._thread = None
 
+        self.detection_count = 0 # Number of consecutive presence detected frames
+
         # Initialize the object detection model
         self.detector = ObjectDetector(
             model_path = model_path,
@@ -371,6 +373,7 @@ class PresenceDetector(CameraService):
         self.logger.info('Ready')
     
     def start(self):
+        self.detection_count = 0  # Reset counter at start
         self.stopped.clear()
         self._thread = Thread(target=self._run)
         self._thread.start()
@@ -392,8 +395,14 @@ class PresenceDetector(CameraService):
             detections = self.detector.detect(frame)
 
             if detections:
-                self.callback('person_detected')
+                self.detection_count += 1
+
+                if self.detection_count == 3: # 3 consecutive frames with presence detected
+                    self.callback('person_detected')
+                    self.detection_count = 0 # Reset counter
+
             else:
+                self.detection_count = 0
                 self.callback('empty_room')
             
             fps.update()
@@ -409,5 +418,6 @@ class PresenceDetector(CameraService):
             self._thread.join()
         
         CameraService.camera.stop(self.__class__.__name__)
+        self.detection_count = 0  # Reset counter at stop
 
         self.logger.info('Stopped')
