@@ -133,7 +133,6 @@ class Wakeface(CameraService):
 
                     # Check if the bounding box meets the minimum size requirement (face close enough)
                     if (closest_looking_bbox.width * closest_looking_bbox.height) >= MIN_BBOX_AREA:
-                        print (closest_looking_bbox.width * closest_looking_bbox.height)
                         self.callback('face_listen') # face looking at camera close enough
 
                         # Notify recognition thread about new close looking face detected
