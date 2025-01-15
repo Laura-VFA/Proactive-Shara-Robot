@@ -46,7 +46,7 @@ def wf_event_handler(event, usernames=None):
     if event == 'face_listen' and eva_context['state'] == 'idle_presence':
         notifications.put({'transition': 'idle_presence2listening'})
     
-    elif event in ['face_not_listen', 'not_faces']:
+    elif event in ['face_not_listen', 'not_faces', 'face_too_far']:
         eva_context['username'] = None
 
         if eva_context['state'] == 'listening':

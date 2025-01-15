@@ -96,6 +96,8 @@ class Wakeface(CameraService):
         CameraService.camera.start(self.__class__.__name__)
         fps = FPS().start()
 
+        MIN_BBOX_AREA = 5000 # Minimum bounding box area to consider a face close enough
+
         while not self.stopped.is_set():
             # Get frame
             frame = CameraService.camera.get_color_frame(resize_width=500)
@@ -119,17 +121,28 @@ class Wakeface(CameraService):
                     if Wakeface.check_looking(face)
                 ]
   
-                if not bboxes_looking : # No one looking
+                if not bboxes_looking : # Faces detected, but not looking
                     self.callback('face_not_listen') 
                     # Empty pending faces to recognize
                     while not self.face_queue.empty(): self.face_queue.get(block=False)
                     self.face_queue.put((None, [])) # Notify recognition thread no looking faces detected
 
                 else:
-                    self.callback('face_listen')
+                    # Find the largest bounding box (closest looking face)
+                    closest_looking_bbox = max(bboxes_looking, key=lambda bbox: bbox.width * bbox.height)
 
-                    # Notify recognition thread about new looking faces detected
-                    self.face_queue.put((frame, bboxes_looking))
+                    # Check if the bounding box meets the minimum size requirement (face close enough)
+                    if (closest_looking_bbox.width * closest_looking_bbox.height) >= MIN_BBOX_AREA:
+                        print (closest_looking_bbox.width * closest_looking_bbox.height)
+                        self.callback('face_listen') # face looking at camera close enough
+
+                        # Notify recognition thread about new close looking face detected
+                        self.face_queue.put((frame, [closest_looking_bbox]))
+
+                    else: # faces looking but not close enough
+                        self.callback('face_too_far')
+                        while not self.face_queue.empty(): self.face_queue.get(block=True)
+                        self.face_queue.put((None, []))  # Notify recognition thread no valid faces detected
 
             fps.update()
 
@@ -261,6 +274,8 @@ class RecordFace(CameraService):
 
         CameraService.camera.start(self.__class__.__name__)
 
+        MIN_BBOX_AREA = 5000 # Minimum bounding box area to consider a face close enough
+
         frames_recorded = 0
         frames_without_faces = 0
         while frames_recorded < n_frames and not self.stopped.is_set():
@@ -291,11 +306,16 @@ class RecordFace(CameraService):
                 ]
  
                 if bboxes_looking:
-                    self.frames_to_encode.put((name, frame, bboxes_looking))                        
-                    frames_recorded += 1
-                    
-                    self.logger.info('Face frame recorded')
-                    self.callback('recording_face', progress=frames_recorded*100/n_frames)
+                    # Find the largest bounding box (closest looking face)
+                    closest_looking_bbox = max(bboxes_looking, key=lambda bbox: bbox.width * bbox.height)
+                        
+                    # Check if the bounding box meets the minimum size requirement (face close enough)
+                    if (closest_looking_bbox.width * closest_looking_bbox.height) >= MIN_BBOX_AREA:
+                        self.frames_to_encode.put((name, frame, [closest_looking_bbox]))                        
+                        frames_recorded += 1
+                        
+                        self.logger.info('Face frame recorded')
+                        self.callback('recording_face', progress=frames_recorded*100/n_frames)
         
         CameraService.camera.stop(self.__class__.__name__)
 
