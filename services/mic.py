@@ -3,12 +3,12 @@ from collections import deque
 from threading import Event, Thread
 
 import pyaudio
-import webrtcvad
-
+import numpy as np
+from silero_vad import get_speech_timestamps, load_silero_vad
 
 class Recorder:
     def __init__(self, callback, chunk_size=2048, format=pyaudio.paInt16,
-                 channels=1, rate=16000, prev_audio_size=1.0, vad_agressiveness=3) -> None:
+                 channels=1, rate=16000, prev_audio_size=1.0) -> None:
         self.logger = logging.getLogger('Mic')
         self.logger.setLevel(logging.DEBUG)
 
@@ -25,7 +25,7 @@ class Recorder:
         self.prev_audio = deque(maxlen=int(prev_audio_size * rate/chunk_size)) 
         
         self.p = pyaudio.PyAudio()
-        self.vad = webrtcvad.Vad(vad_agressiveness)
+        self.model = load_silero_vad()  # Load Silero VAD model
         self.stream = None
 
         self._thread = None
@@ -34,16 +34,23 @@ class Recorder:
         self.stop_recording = Event()
         self.callback = callback
 
+        self.audio_buffer = deque(maxlen=int(rate / chunk_size * 2))  # Buffer for 2 seconds of audio (Silero needs minumun audio buffer size)
+
         self.logger.info('Ready')
     
     def on_data(self, in_data, frame_count, time_info, flag): # Callback for recorded audio
         is_speech = False
 
-        # Detect if voice in the audio chunk
-        for frame in frame_generator(30, in_data, self.rate): # Vad requires audio frames of 10, 20 or 30 ms
-            if self.vad.is_speech(frame, self.rate):
+        # Append incoming data to the buffer
+        self.audio_buffer.append(in_data)
+
+        # Process buffer if it contains enough data
+        if len(self.audio_buffer) == self.audio_buffer.maxlen: # reach the max length of the buffer
+            audio_chunk = np.frombuffer(b''.join(self.audio_buffer), dtype=np.int16).astype(np.float32) / 32768.0 # needed format for Silero VAD
+            voiced_timestamps = get_speech_timestamps(audio_chunk, self.model, sampling_rate=self.rate)
+
+            if voiced_timestamps:
                 is_speech = True
-                break
 
         if is_speech:
             if not self.start_recording.is_set():
@@ -63,8 +70,6 @@ class Recorder:
         
         return (in_data, pyaudio.paContinue)
 
-
-    
     def start(self):
 
         self.stopped.clear()
@@ -101,7 +106,6 @@ class Recorder:
         self.stream.close()
         self.stream = None
 
-
     def stop(self):
         self.logger.info("Mic closed")
 
@@ -120,17 +124,3 @@ class Recorder:
     def destroy(self):
         self.stop()
         self.p.terminate()
-
-def frame_generator(frame_duration_ms, audio, sample_rate):
-    """Generates audio frames from PCM audio data.
-    Takes the desired frame duration in milliseconds, the PCM data, and
-    the sample rate.
-    Yields Frames of the requested duration.
-
-    https://github.com/wiseman/py-webrtcvad/blob/master/example.py
-    """
-    n = int(sample_rate * (frame_duration_ms / 1000.0) * 2)
-    offset = 0
-    while offset + n < len(audio):
-        yield audio[offset:offset + n]
-        offset += n
