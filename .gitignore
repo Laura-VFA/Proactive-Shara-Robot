@@ -166,6 +166,10 @@ cython_debug/
 ibm-credentials.env
 *credentials.json
 
+# Configuration files
+assistant_data.json
+
+
 # Other
 *.pickle
 *.csv
