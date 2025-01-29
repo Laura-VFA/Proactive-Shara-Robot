@@ -12,7 +12,8 @@ voice = texttospeech.VoiceSelectionParams(
 )
 tts_config = texttospeech.AudioConfig(
     audio_encoding=texttospeech.AudioEncoding.LINEAR16,
-    sample_rate_hertz=24000
+    sample_rate_hertz=24000,
+    pitch=-0.4,
 )
 
 # STT 
