@@ -2,14 +2,14 @@
     "type": "function",
     "function": {
         "name": "record_face",
-        "description": "Register a user in the system. It must be executed if and only if 'proactive_question' is 'who_are_you' in user input. Never otherwise.",
+        "description": "Register a user in the system. This function should only be executed when 'proactive_question' in user input is exactly 'who_are_you' and the user explicitly provides a name. If the user response is vague, avoid calling this function.",
         "strict": true,
         "parameters": {
             "type": "object",
             "properties": {
                 "username": {
                     "type": "string",
-                    "description": "The name of the user that it's being introduced"
+                    "description": "The name of the user that it's being introduced,  which should be a valid name (e.g., 'Luisa', 'John Doe')."
                 }
             },
             "additionalProperties": false,
