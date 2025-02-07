@@ -1,126 +1,117 @@
 import json
-from openai import OpenAI
-
+from openai import OpenAI  
 
 client = OpenAI()
 
-thread_id = ''
-assistant_id = ''
+# Load prompt from file
+def load_prompt(filename="files/shara_prompt.txt"):
+    with open(filename, "r", encoding="utf-8") as file:
+        return file.read().strip()
 
-# Assistant description (personlaity prompt)
-shara_descrip = ''
-with open("files/shara_prompt.txt", "r") as f:
-    shara_descrip = f.read()
-
-
-# Asssistant functions
-def create_assistant_thread(name="SHARA", instructions=shara_descrip, tools=[], model="gpt-4o-mini"):
-    global assistant_id, thread_id
-    assistant = client.beta.assistants.create(
-        name=name,
-        instructions=instructions,
-        tools=tools,
-        model=model
-    )
-    assistant_id = assistant.id
-
-    # Create a thread (conversation) for the assistant
-    thread = create_thread()
-    thread_id = thread.id
-
-    # Save assistant and thread ids for future use
-    save_assistant_data(assistant_id, thread_id)
-
-    return assistant, thread
-
-def get_assistant(assistant_id):
-    return client.beta.assistants.retrieve(assistant_id)
-
-def delete_assistant(assistant_id):
-    return client.beta.assistants.delete(assistant_id)
-
-def list_assistants():
-    return client.beta.assistants.list(order="desc", limit=20).data
+# Load function tools from file
+def load_tools(filename="files/tools_config.json"):
+    with open(filename, "r", encoding="utf-8") as file:
+        return json.load(file)
 
 
-# Thread functions
-def create_thread():
-    return client.beta.threads.create()
+shara_prompt = load_prompt()
+tools = load_tools()
+conversation_history = []
 
-def get_thread(thread_id):
-    return client.beta.threads.retrieve(thread_id)
+# OpenAI completion arguments configuration
+completion_args = {
+    "model": "gpt-4o-mini",
+    "response_format": {'type': "json_object"},
+    "store": True,
+    "temperature": 1,
+    "top_p": 1
+}
 
-def delete_thread(thread_id):
-    return client.beta.threads.delete(thread_id)
 
 
-# Function to prepare the assistant and thread for interaction
-def prepare_assistant_thread():
-    global assistant_id, thread_id
+def handle_tool_call(tool_call, context_data):
+    ''' Tool (functions) calling handler. Process tool calls and return the result and robot action if needed '''
 
-    if not assistant_id: # Assistant is not loaded
-        assistant_id, thread_id = load_assistant_data()
+    tool_name = tool_call.function.name
+    args = json.loads(tool_call.function.arguments)
 
-        if not assistant_id: # No existing assistant
-            assistant, thread = create_assistant_thread()
-            assistant_id = assistant.id
-            thread_id = thread.id
-            save_assistant_data(assistant_id, thread_id)
+    result = ''
+    robot_action = {}
 
-        elif not thread_id: # There is assistant but not thread
-            thread = create_thread()
-            thread_id = thread.id
-            save_thread_id(thread_id)
-
+    if tool_name == "record_face" and context_data.get("proactive_question") == "who_are_you":
+        username = args.get("username", 'Desconocido')
+        if username != 'Desconocido':
+            result = 'True'
+            robot_action = {"action": "record_face", "username": args['username']} 
+        else:
+            result = 'False'
     
+    return result, robot_action
+
+
+def build_messages(input_text, context_data):
+    ''' Build messages with conversation history '''
+
+    messages = [{"role": "developer", "content": shara_prompt}] + conversation_history # include conversation history
+    user_message = {"role": "user", "content": json.dumps({**context_data, "user_input": input_text})}
+
+    messages.append(user_message)
+    conversation_history.append(user_message)
+
+    return messages
+
+
+def get_tools_for_context(context_data):
+    ''' Return tools to use based on context data '''
+    # Filter who_are_you proactive question (avoid unnecessary record_face tool)
+    tools_to_use = tools if context_data.get("proactive_question") == "who_are_you" else [
+        tool for tool in tools if tool["function"]["name"] != "record_face"
+    ]
+
+    return tools_to_use
 
 
 def generate_response(input_text, context_data={}):
-    global thread_id, assistant_id
-
+    ''' Generate response from user input, context data, and conversation history '''
     if not input_text:
         return None
-
-    # Cereate message in the thread
-    client.beta.threads.messages.create(
-        thread_id=thread_id,
-        role="user",
-        content=json.dumps({**context_data, "user_input": input_text})
-    )
-
-    robot_context = ""
-    with client.beta.threads.runs.stream(
-        thread_id=thread_id,
-        assistant_id=assistant_id
-    ) as stream:
-        robot_context = json.loads(''.join(text for text in stream.text_deltas))
     
-    response = robot_context.pop("response", "")    
+    messages = build_messages(input_text, context_data)
+    tools_to_use = get_tools_for_context(context_data)
+
+    # Create OpenAI completion arguments
+    completion_args["messages"] = messages
+    if tools_to_use:  # Only add 'tools' if there are tools available
+        completion_args["tools"] = tools_to_use
+
+    robot_action = {}
+    response = client.chat.completions.create(**completion_args)
+
+    if response.choices[0].message.tool_calls:
+        tool_call = response.choices[0].message.tool_calls[0]
+        result, robot_action = handle_tool_call(tool_call, context_data)
+
+        messages.append(response.choices[0].message)  # append model's function call message
+        messages.append({                               # append result message
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": result
+        })
+
+        response = client.chat.completions.create(**completion_args)
     
-    return response, robot_context
+    # Extract response text from OpenAI response
+    response_text = response.choices[0].message.content
 
+    # Add response to conversation history
+    conversation_history.append({"role": "assistant", "content": response_text})
 
-
-
-# Utils
-def save_assistant_data(assistant_id, thread_id, file_path="files/assistant_data.json"):
-    with open(file_path, "w") as f:
-        json.dump({"assistant_id": assistant_id, "thread_id": thread_id}, f)
-
-def load_assistant_data(file_path="files/assistant_data.json"):
     try:
-        with open(file_path, "r") as f:
-            data = json.load(f)
-            print(data)
-            return data.get("assistant_id"), data.get("thread_id")
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None, None
+        robot_context = json.loads(response_text)
+    except json.JSONDecodeError:
+        robot_context = {}
 
-def load_thread_id(file_path="files/assistant_data.json"):
-    _, thread_id = load_assistant_data(file_path)
-    return thread_id
+    response_text = robot_context.pop("response", "")
+    robot_context = robot_context | robot_action
 
-def save_thread_id(thread_id, file_path="files/assistant_data.json"):
-    assistant_id, _ = load_assistant_data(file_path)
-    save_assistant_data(assistant_id, thread_id)
-
+    return response_text, robot_context
