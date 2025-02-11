@@ -166,8 +166,8 @@ cython_debug/
 ibm-credentials.env
 *credentials.json
 
-# Configuration files
-assistant_data.json
+# Conversation files
+conversations_db.json
 
 
 # Other

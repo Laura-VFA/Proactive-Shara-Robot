@@ -2,6 +2,7 @@ import json
 from openai import OpenAI  
 
 client = OpenAI()
+conversation_history = []
 
 # Load prompt from file
 def load_prompt(filename="files/shara_prompt.txt"):
@@ -13,10 +14,42 @@ def load_tools(filename="files/tools_config.json"):
     with open(filename, "r", encoding="utf-8") as file:
         return json.load(file)
 
+# Load and save conversation history
+def load_conversation_history(username, filename="files/conversations_db.json"):
+    global conversation_history
+
+    if username:
+        try:
+            with open(filename, "r", encoding="utf-8") as file:
+                conversation_dict = json.load(file)
+                conversation_history = conversation_dict.get(username, [])
+        except (FileNotFoundError, json.JSONDecodeError):
+            conversation_history = []
+    
+    else:
+        conversation_history = []
+
+def save_conversation_history(username, filename="files/conversations_db.json"):
+    if username: # Save conversation history only if username is provided
+        conversation_dict = {}
+
+        try:
+            with open(filename, "r", encoding="utf-8") as file:
+                conversation_dict = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+        # Update conversation history
+        conversation_dict[username] = conversation_history
+
+        # Save conversation history to file
+        with open(filename, "w", encoding="utf-8") as file:
+            json.dump(conversation_dict, file, ensure_ascii=False, indent=4)
+
+
 
 shara_prompt = load_prompt()
 tools = load_tools()
-conversation_history = []
 
 # OpenAI completion arguments configuration
 completion_args = {

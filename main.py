@@ -189,19 +189,15 @@ def process_transition(transition, params={}):
         leds.set(LedState.loop((255,255,255))) # set white loop color
         wf.stop()
         try:
-            server.prepare() # Create session in advance if necessary
+            server.load_conversation_db(robot_context['username']) # Load conversation history for that user
         except Exception as e:
-            logger.warning(f'Could not create the IBM session. {str(e)}') 
+            logger.warning(f'Could not load conversation history. {str(e)}') 
     
     # User in conversation starts talking
     elif transition == 'listening_without_cam2recording' and robot_context['state'] == 'listening_without_cam':
         robot_context['state'] = 'recording'
         leds.set(LedState.loop((255,255,255))) # set white loop color
         listen_timer.cancel()
-        try:
-            server.prepare() # Create session in advance if necessary
-        except Exception as e:
-            logger.warning(f'Could not create the IBM session. {str(e)}')
 
     # User finished talking: sending audio to server
     elif transition == 'recording2processingquery' and robot_context['state'] == 'recording':
@@ -295,6 +291,11 @@ def process_transition(transition, params={}):
 
     # Conversation finishes due to goodbye
     elif transition == 'speaking2idle_presence' and robot_context['state'] == 'speaking':
+        try:
+            server.dump_conversation_db(robot_context['username']) # Update conversation history database
+        except Exception as e:
+            logger.warning(f'Could not dump conversation database. {str(e)}') 
+
         robot_context['state'] = 'idle_presence' 
         robot_context['username'] = None
         robot_context['proactive_question'] = ''
@@ -318,6 +319,11 @@ def process_transition(transition, params={}):
         rf.stop()
         pd.start()
         wf.start()
+
+        try:
+            server.dump_conversation_db(robot_context['username']) # Update conversation history database
+        except Exception as e:
+            logger.warning(f'Could not dump conversation database. {str(e)}') 
 
     # Handle a proactive question
     elif transition == 'proactive2processingquery':
