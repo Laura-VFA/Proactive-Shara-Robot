@@ -359,9 +359,9 @@ def process_transition(transition, params={}):
                     leds.set(LedState.breath((52,158,235))) # light blue led breath animation
                     speaker.start(audio_response)
                     try:
-                        server.prepare() # Create session in advance if necessary
+                        server.load_conversation_db(robot_context['username']) # Load conversation history for that user
                     except Exception as e:
-                        logger.warning(f'Could not create the IBM session. {str(e)}')
+                        logger.warning(f'Could not load conversation history. {str(e)}') 
 
                     proactive.update('confirm', 'how_are_you')
 
@@ -396,9 +396,9 @@ def process_transition(transition, params={}):
                     leds.set(LedState.breath((52,158,235))) # light blue led breath animation
                     speaker.start(audio_response)
                     try:
-                        server.prepare() # Create session in advance if necessary
+                        server.load_conversation_db(robot_context['username']) # Load conversation history for that user
                     except Exception as e:
-                        logger.warning(f'Could not create the IBM session. {str(e)}')
+                        logger.warning(f'Could not load conversation history. {str(e)}') 
 
                     proactive.update('confirm', 'who_are_you')
             else:
