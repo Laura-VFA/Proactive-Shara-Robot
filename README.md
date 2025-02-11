@@ -3,6 +3,12 @@
 Shara is a **social 🗣 and affective ❤️ robot**. It is not only a passive assistant, but an active one: **proactive behaviour** is incorporated in the robot. It can start conversations and show concern about the user, making the interaction more natural and affective.  
 This repo contains the *brain* 🧠 structure of the robot, the proactive and interaction behavior themselves.
 
+
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/3c898751-434d-42ab-8865-fbc9937a91e2" width="300">
+</p>
+
 ## Be different 😎
 With SHARA, you can have conversations in the more natural way. It is activated by a novel method called wakeface, in which the robot activates/listens the user by looking at it. Also, it is able to start conversations by using proactive questions.
 
