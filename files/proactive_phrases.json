@@ -8,13 +8,5 @@
     "who_are_you": [
         "Creo que no nos conocemos. ¿Cómo te llamas?",
         "¡Hola! ¿Cómo te llamas?"
-    ],
-    "single_tg_msg": [
-        "{name} te ha escrito un mensaje que dice: {msg}", 
-        "{name} dice: {msg}"
-    ],
-    "multi_tg_msg": [
-        "{name} te ha escrito varios mensajes que dicen: {msg}",
-        "{name} dice: {msg}"
     ]   
 }
