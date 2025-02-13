@@ -6,7 +6,6 @@ import threading
 from services.camera_services import (FaceDB, PresenceDetector, RecordFace,
                                      Wakeface)
 from services.cloud import server
-from services.cloud.telegram import TelegramService
 from services.eyes.service import Eyes
 from services.leds import ArrayLed, LedState
 from services.mic import Recorder
@@ -23,8 +22,7 @@ robot_context = { # Eva status & knowledge of the environment
     'state':'idle', 
     'username': None, 
     'continue_conversation': False, 
-    'proactive_question': '', 
-    'tg_destination_name': ''
+    'proactive_question': ''
 }
 
 notifications = queue.Queue() # Transition state queue
@@ -35,9 +33,6 @@ DELAY_TIMEOUT = 5 # in sec
 # Preload of error audios
 with open('files/connection_error.wav', 'rb') as f:
     connection_error_audio = f.read()
-with open('files/tg_contact_error.wav', 'rb') as f:
-    tg_contact_error_audio = f.read()
-
 
 
 def wf_event_handler(event, usernames=None):
@@ -132,15 +127,6 @@ def proactive_service_event_handler(event, params={}):
         notification ['params']['question'] = 'read_pending_messages'
         notification['params']['messages'] = params
         notifications.put(notification)
-        
-def tg_event_handler(name, message): # incoming telegram message
-    notifications.put({
-        'transition': 'received_tg_message', 
-        'params': {
-            'name': name, # Sender contact name
-            'message': message
-        }
-    })
 
 
 def listen_timeout_handler():
@@ -221,7 +207,6 @@ def process_transition(transition, params={}):
             robot_context['continue_conversation'] = False
             robot_context['proactive_question'] = ''
             robot_context['state'] = 'speaking'
-            robot_context['tg_destination_name'] = ''
             leds.set(LedState.breath((255,0,0))) # set breath red animation
             speaker.start(connection_error_audio)
         else:
@@ -230,20 +215,6 @@ def process_transition(transition, params={}):
                     if response.action == 'record_face':
                         robot_context['username'] = response.username
                         rf.start(response.username)
-                    elif response.action == 'update_target_name':
-                        # Get text from speech to obtain target message contact name
-                        text = response.request.text.split()
-                        dst_name = ' '.join(text[text.index('a' if 'a' in text else 'para') + 1 :])
-                        robot_context['tg_destination_name'] = dst_name
-                    elif response.action == 'send_message': # Send telegram message
-                        msg = response.request.text
-                        try:
-                            tg.send_message(robot_context['tg_destination_name'], msg)
-                        except (KeyError, IndexError): # Contact not found
-                            logger.error(f"Target user '{robot_context['tg_destination_name']}' not found in TG contacts list")
-
-                            response.audio = tg_contact_error_audio
-                        robot_context['tg_destination_name'] = '' # Clear target name
 
                 robot_context['continue_conversation'] = response.continue_conversation
                 robot_context['proactive_question'] = ''
@@ -272,8 +243,7 @@ def process_transition(transition, params={}):
 
                 robot_context['state'] = 'idle_presence'
                 robot_context['username'] = None
-                robot_context['proactive_question'] = ''
-                robot_context['tg_destination_name'] = ''                
+                robot_context['proactive_question'] = ''           
                 eyes.set('neutral')
                 leds.set(LedState.static_color((0,0,0))) # put black static color
                 pd.start()
@@ -299,7 +269,6 @@ def process_transition(transition, params={}):
         robot_context['state'] = 'idle_presence' 
         robot_context['username'] = None
         robot_context['proactive_question'] = ''
-        robot_context['tg_destination_name'] = ''
         robot_context['continue_conversation'] = False
         eyes.set('neutral')
         leds.set(LedState.static_color((0,0,0))) # put black static color
@@ -312,7 +281,6 @@ def process_transition(transition, params={}):
         robot_context['state'] = 'idle_presence'
         robot_context['continue_conversation'] =  False
         robot_context['proactive_question'] =  ''
-        robot_context['tg_destination_name'] = ''
         eyes.set('neutral')
         leds.set(LedState.static_color((0,0,0))) # put black static color
         mic.stop()
@@ -403,52 +371,7 @@ def process_transition(transition, params={}):
                     proactive.update('confirm', 'who_are_you')
             else:
                 proactive.update('abort', 'who_are_you')
-            
-        elif params['question'] == 'read_pending_messages':
-            if robot_context['state'] in ['listening', 'idle_presence']: # Check if it's a good moment to read the messages
-                robot_context['state'] = 'processing_query'
-                leds.set(LedState.static_color((0,0,0))) # set static black color
 
-                # Interrupt services
-                if robot_context['state'] == 'listening': mic.stop()
-                wf.stop()
-                if robot_context['state'] == 'idle_presence': pd.stop()
-
-                
-                # Join messages (if several)
-                text = '. '.join(
-                    ProactivePhrases.get('single_tg_msg').format(
-                        name=name, msg=messages[0]
-                    ) if len(messages) == 1 
-                    else ProactivePhrases.get('multi_tg_msg').format(
-                            name=name, msg='. '.join(messages)
-                            )
-                    for name, messages in params['messages'].items()
-                )
-
-                try:
-                    # Generate the audio
-                    audio_response = server.text_to_speech(text)    
-
-                except Exception as e: # Error in server connection
-                    logger.error(f'TTS failed. {str(e)}')
-
-                    robot_context['continue_conversation'] = False
-                    robot_context['proactive_question'] = ''
-                    robot_context['state'] = 'speaking'
-                    leds.set(LedState.breath((255,0,0))) # red breath animation
-                    speaker.start(connection_error_audio)
-
-                    proactive.update('abort', 'read_pending_messages')
-                else:
-                    robot_context['continue_conversation'] = False
-                    robot_context['state'] = 'speaking'
-                    leds.set(LedState.breath((0,255,0))) # green breath animation
-                    speaker.start(audio_response)
-
-                    proactive.update('confirm', 'read_pending_messages')
-            else:
-                proactive.update('abort', 'read_pending_messages')
 
     # Record new user face
     elif transition == 'recording_face':
@@ -465,42 +388,6 @@ def process_transition(transition, params={}):
             else:
                 leds.set(LedState.static_color((0,0,0))) # static black color
 
-    # Handle incoming telegram message
-    elif transition == 'received_tg_message':
-        if robot_context['state'] in ['idle_presence', 'listening']: # Message can be read right now
-            robot_context['state'] = 'processing_query'
-            leds.set(LedState.static_color((0,0,0))) # static black color
-
-            # Interrupt services
-            if robot_context['state'] == 'listening': mic.stop()
-            wf.stop()
-            if robot_context['state'] == 'idle_presence': pd.stop()
-
-            try:
-                audio_response = server.text_to_speech(
-                    ProactivePhrases.get('single_tg_msg').format(
-                        name=params["name"], msg=params["message"]
-                    )
-                )    
-            except Exception as e: # Error in server connection
-                logger.error(f'TTS failed. {str(e)}')
-
-                robot_context['continue_conversation'] = False
-                robot_context['proactive_question'] = ''
-                robot_context['state'] = 'speaking'
-                leds.set(LedState.breath((255,0,0))) # red breath led animation
-                speaker.start(connection_error_audio)
-
-            else:
-                robot_context['continue_conversation'] = False
-                robot_context['state'] = 'speaking'
-                leds.set(LedState.breath((0,255,0))) # green breath led animation
-                speaker.start(audio_response)
-        
-        else:
-            # Pass message to proactive service, to read it later
-            proactive.update('sensor', 'received_tg_message', params)
-    
     else:
         logger.info(f'Transition {transition} discarded')
 
@@ -522,8 +409,6 @@ if __name__ == '__main__':
     speaker = Speaker(speaker_event_handler)
     mic = Recorder(mic_event_handler)
 
-    tg = TelegramService(tg_event_handler)
-
 
     pd.start()
 
@@ -544,6 +429,5 @@ if __name__ == '__main__':
     speaker.destroy()
     leds.stop()
     eyes.stop()
-    tg.stop()
 
     logger.info('Stopped')

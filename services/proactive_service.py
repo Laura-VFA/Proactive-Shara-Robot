@@ -30,8 +30,6 @@ class ProactiveService:
         self.logger.info(f'First how_are_you set at {self.next_question_time}')
         # [TEST] self.next_question_time = datetime.now() + timedelta(minutes=1)
 
-        self.tg_messages = {} # Telegram pending incoming messages
-
         self.logger.info('Ready')
 
     
@@ -43,17 +41,10 @@ class ProactiveService:
                 # Timeout, ask 'How are you?'
                 if (self.next_question_time - datetime.now()).total_seconds() <= 0: 
                     self.callback('ask_how_are_you')
-                
-                if self.tg_messages: # Read telegram messages
-                    self.callback('read_pending_messages', self.tg_messages)
 
             elif subtype == 'unknown_face': # Ask new user's name
                 self.callback('ask_who_are_you')
-            
-            elif subtype == 'received_tg_message': # Save telegram messages for later
-                prev_messages = self.tg_messages.get(args['name'], [])
-                prev_messages.append(args['message'])
-                self.tg_messages[args['name']] = prev_messages
+
             
         elif type == 'abort':
             if subtype == 'how_are_you':
@@ -76,6 +67,3 @@ class ProactiveService:
 
             elif subtype == 'who_are_you':
                 pass
-            
-            elif subtype == 'read_pending_messages':
-                self.tg_messages.clear() # Clear messages
