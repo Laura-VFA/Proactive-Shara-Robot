@@ -10,7 +10,7 @@ logger.setLevel(logging.DEBUG)
 
 @dataclass
 class Request:
-    audio: str
+    audio: str = b''
     text: str = None
     username: str = None
     proactive_question: str = ''
@@ -43,6 +43,34 @@ def query(request: Request):
 
     # Generate the response
     text_response, robot_context = generate_response(request.text, context_variables)
+    logger.info(f'Response text :: {text_response}')
+    logger.info(f'Response context :: {robot_context}')
+
+    # TTS
+    audio_response = text_to_speech(text_response)
+    logger.info("TTS result obtained")
+
+    # Send back the response
+    return Response(
+        request,
+        audio_response,
+        robot_context.get('action', None),
+        robot_context.get('username', None),
+        bool(robot_context.get('continue', '')),
+        robot_context['robot_mood'] if 'robot_mood' in robot_context and robot_context['robot_mood'] else 'neutral',
+        text_response
+    )
+
+def proactive_query(request: Request):
+    # Same as query but with empty input_text and without STT
+    # Set context variables
+    context_variables = {}
+    context_variables["username"] = request.username
+    context_variables["proactive_question"] = request.proactive_question 
+    logger.info(f'Query context :: {context_variables}')
+
+    # Generate the response
+    text_response, robot_context = generate_response('', context_variables) # Empty input_text since it's a proactive question
     logger.info(f'Response text :: {text_response}')
     logger.info(f'Response context :: {robot_context}')
 

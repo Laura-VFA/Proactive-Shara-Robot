@@ -4,19 +4,6 @@ import random
 from datetime import datetime, timedelta
 
 
-class ProactivePhrases:
-    phrases = None
-
-    @staticmethod
-    def load(encodings_file='files/proactive_phrases.json'):
-        with open(encodings_file) as json_file:
-            ProactivePhrases.phrases = json.load(json_file)
-    
-    @staticmethod
-    def get(phrase_key):
-        return random.choice(ProactivePhrases.phrases[phrase_key])
-
-
 class ProactiveService:
     def __init__(self, callback) -> None:
         self.logger = logging.getLogger('Proactive')

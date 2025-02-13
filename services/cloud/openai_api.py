@@ -71,7 +71,7 @@ def handle_tool_call(tool_call, context_data):
     result = ''
     robot_action = {}
 
-    if tool_name == "record_face" and context_data.get("proactive_question") == "who_are_you":
+    if tool_name == "record_face" and context_data.get("proactive_question") == "who_are_you_response":
         username = args.get("username", 'Desconocido')
         if username != 'Desconocido':
             result = 'True'
@@ -97,7 +97,7 @@ def build_messages(input_text, context_data):
 def get_tools_for_context(context_data):
     ''' Return tools to use based on context data '''
     # Filter who_are_you proactive question (avoid unnecessary record_face tool)
-    tools_to_use = tools if context_data.get("proactive_question") == "who_are_you" else [
+    tools_to_use = tools if context_data.get("proactive_question") == "who_are_you_response" else [
         tool for tool in tools if tool["function"]["name"] != "record_face"
     ]
 
@@ -106,8 +106,6 @@ def get_tools_for_context(context_data):
 
 def generate_response(input_text, context_data={}):
     ''' Generate response from user input, context data, and conversation history '''
-    if not input_text:
-        return None
     
     messages = build_messages(input_text, context_data)
     tools_to_use = get_tools_for_context(context_data)

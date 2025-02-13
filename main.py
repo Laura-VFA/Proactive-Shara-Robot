@@ -9,7 +9,7 @@ from services.cloud import server
 from services.eyes.service import Eyes
 from services.leds import ArrayLed, LedState
 from services.mic import Recorder
-from services.proactive_service import ProactivePhrases, ProactiveService
+from services.proactive_service import ProactiveService
 from services.speaker import Speaker
 
 
@@ -121,11 +121,6 @@ def proactive_service_event_handler(event, params={}):
     
     elif event == 'ask_who_are_you':
         notification ['params']['question'] = 'who_are_you'
-        notifications.put(notification)
-    
-    elif event == 'read_pending_messages':
-        notification ['params']['question'] = 'read_pending_messages'
-        notification['params']['messages'] = params
         notifications.put(notification)
 
 
@@ -308,24 +303,27 @@ def process_transition(transition, params={}):
                 pd.stop()
 
                 try:
-                    audio_response = server.text_to_speech(ProactivePhrases.get(params['question']))
-                except Exception as e: # Error in server connection
-                    logger.error(f'TTS failed. {str(e)}')
+                    response = server.proactive_query( # Make the query to the cloud
+                        server.Request(
+                            username=robot_context['username'], 
+                            proactive_question='how_are_you'
+                        )
+                    )
+                except Exception as e: # Unable to connect to the server: play error msg
+                    logger.error(f'Could not make the query. {str(e)}')
 
                     robot_context['continue_conversation'] = False
                     robot_context['proactive_question'] = ''
                     robot_context['state'] = 'speaking'
-                    leds.set(LedState.breath((255,0,0))) # red breath animation
+                    leds.set(LedState.breath((255,0,0))) # set breath red animation
                     speaker.start(connection_error_audio)
 
                     proactive.update('abort', 'how_are_you')
-
                 else:
-                    robot_context['proactive_question'] = 'how_are_you'
                     robot_context['continue_conversation'] = True
                     robot_context['state'] = 'speaking'
                     leds.set(LedState.breath((52,158,235))) # light blue led breath animation
-                    speaker.start(audio_response)
+                    speaker.start(response.audio)
                     try:
                         server.load_conversation_db(robot_context['username']) # Load conversation history for that user
                     except Exception as e:
@@ -346,7 +344,12 @@ def process_transition(transition, params={}):
                 wf.stop()
 
                 try:
-                    audio_response = server.text_to_speech(ProactivePhrases.get(params['question']))    
+                    response = server.proactive_query( # Make empty query to the cloud
+                        server.Request(
+                            username=robot_context['username'], 
+                            proactive_question='who_are_you'
+                        )
+                    )
                 except Exception as e: # Error in server connection
                     logger.error(f'TTS failed. {str(e)}')
 
@@ -358,11 +361,11 @@ def process_transition(transition, params={}):
 
                     proactive.update('abort', 'who_are_you')
                 else:
-                    robot_context['proactive_question'] = 'who_are_you'
+                    robot_context['proactive_question'] = 'who_are_you_response'
                     robot_context['continue_conversation'] = True
                     robot_context['state'] = 'speaking'
                     leds.set(LedState.breath((52,158,235))) # light blue led breath animation
-                    speaker.start(audio_response)
+                    speaker.start(response.audio)
                     try:
                         server.load_conversation_db(robot_context['username']) # Load conversation history for that user
                     except Exception as e:
@@ -398,7 +401,6 @@ if __name__ == '__main__':
     leds = ArrayLed()
     eyes = Eyes(sc_width=600, sc_height=1024)
     FaceDB.load() # load face embeddings
-    ProactivePhrases.load()
 
     wf = Wakeface(wf_event_handler)
     rf = RecordFace(rf_event_handler)
