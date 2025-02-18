@@ -422,7 +422,8 @@ if __name__ == '__main__':
             process_transition(**notification)
     except KeyboardInterrupt:
         pass
-        
+
+    server.dump_conversation_db(robot_context['username']) # dump in-RAM conversation history before exit
 
     wf.stop()
     rf.stop()
