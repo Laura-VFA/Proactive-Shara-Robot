@@ -86,7 +86,7 @@ def build_messages(input_text, context_data):
     ''' Build messages with conversation history '''
 
     messages = [{"role": "developer", "content": shara_prompt}] + conversation_history # include conversation history
-    user_message = {"role": "user", "content": json.dumps({**context_data, "user_input": input_text})}
+    user_message = {"role": "user", "content": json.dumps({**context_data, "user_input": input_text}, ensure_ascii=False)}
 
     messages.append(user_message)
     conversation_history.append(user_message)
