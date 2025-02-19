@@ -209,7 +209,7 @@ def process_transition(transition, params={}):
             speaker.start(connection_error_audio)
         else:
             if response:
-                if response.action: # Execute associated action # TODO check with function calling
+                if response.action: # Execute associated action
                     if response.action == 'record_face':
                         robot_context['username'] = response.username
                         rf.start(response.username)
@@ -280,23 +280,23 @@ def process_transition(transition, params={}):
     # Conversation finishes due to timeout waiting for user audio
     elif transition == 'listening_without_cam2idle_presence'and robot_context['state'] == 'listening_without_cam':
 
+        try:
+            server.dump_conversation_db(robot_context['username']) # Update conversation history database
+        except Exception as e:
+            logger.warning(f'Could not dump conversation database. {str(e)}') 
+        
         proactive.update('new_timer', 'how_are_you', {'username': robot_context['username']})
-        # TODO: clean username???????
 
-        robot_context['state'] = 'idle_presence'
-        robot_context['continue_conversation'] =  False
-        robot_context['proactive_question'] =  ''
+        robot_context['state'] = 'idle_presence' 
+        robot_context['username'] = None
+        robot_context['proactive_question'] = ''
+        robot_context['continue_conversation'] = False
         eyes.set('neutral')
         leds.set(LedState.static_color((0,0,0))) # put black static color
         mic.stop()
         rf.stop()
         pd.start()
         wf.start()
-
-        try:
-            server.dump_conversation_db(robot_context['username']) # Update conversation history database
-        except Exception as e:
-            logger.warning(f'Could not dump conversation database. {str(e)}') 
 
 
     # Handle a proactive question
@@ -311,7 +311,7 @@ def process_transition(transition, params={}):
 
                 # Interrupt services
                 wf.stop()
-                pd.stop() #TODO check if it's necessary from listening state
+                pd.stop()
                 mic.stop()
 
                 try:
