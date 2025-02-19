@@ -44,31 +44,21 @@ class ProactiveService:
             elif subtype == 'unknown_face': # Ask new user's name
                 self.callback('ask_who_are_you')
 
-            
-        elif type == 'abort':
-            if subtype == 'how_are_you':
-                self.next_presence_question_time = datetime.now() + timedelta(hours=2) # Postpone the timer 2 hours
-                self.logger.info(f"{subtype} - presence postponed until {self.next_presence_question_time}")
 
-                if args['type'] == 'close_face_recognized': # Set new alarm for close face 30 minute later and for presence 2 hours later
+        elif type == 'new_timer':
+            if subtype == 'how_are_you':# set next future alarms for proactive questions
+                 # Set new alarm for presence 2 hours later
+                self.next_presence_question_time = datetime.now() + timedelta(hours=2)
+                self.logger.info(f"Next how_are_you - presence timer set at {self.next_presence_question_time}")
+
+                if args['username']: # Set new alarm for close face (specific user) 30 minute later
                     self.next_close_face_question_time[args['username']] = datetime.now() + timedelta(minutes=30)
-                    self.logger.info(f"{subtype} - {args['type']} postponed until {self.next_close_face_question_time}")
-            
-            elif subtype == 'who_are_you':
-                pass
-    
+                    self.logger.info(f"Next how_are_you - close_face_recognized ({args['username']}) set at {self.next_close_face_question_time}")
+
 
         elif type == 'confirm': # Questions asked
-            if subtype == 'how_are_you':# set next future alarms for proactive questions
-                if args['type'] == 'presence': # Set new alarm for presence 4 hours later
-                    self.next_presence_question_time = datetime.now() + timedelta(hours=4)  
-
-                elif args['type'] == 'close_face_recognized': # Set new alarm for close face 30 minute later and for presence 2 hours later
-                    self.next_close_face_question_time[args['username']] = datetime.now() + timedelta(minutes=30)
-                    self.next_presence_question_time = datetime.now() + timedelta(hours=2)
-                    self.logger.info(f"Next {subtype} - {args['type']} set at {self.next_close_face_question_time}")
-
-                self.logger.info(f"Next {subtype} - presence set at {self.next_presence_question_time}")
+            if subtype == 'how_are_you':
+                self.logger.info(f"{subtype} - {args} proactive question asked")
 
             elif subtype == 'who_are_you': 
                 pass

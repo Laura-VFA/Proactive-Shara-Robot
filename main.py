@@ -264,6 +264,8 @@ def process_transition(transition, params={}):
             server.dump_conversation_db(robot_context['username']) # Update conversation history database
         except Exception as e:
             logger.warning(f'Could not dump conversation database. {str(e)}') 
+        
+        proactive.update('new_timer', 'how_are_you', {'username': robot_context['username']})
 
         robot_context['state'] = 'idle_presence' 
         robot_context['username'] = None
@@ -277,6 +279,10 @@ def process_transition(transition, params={}):
     
     # Conversation finishes due to timeout waiting for user audio
     elif transition == 'listening_without_cam2idle_presence'and robot_context['state'] == 'listening_without_cam':
+
+        proactive.update('new_timer', 'how_are_you', {'username': robot_context['username']})
+        # TODO: clean username???????
+
         robot_context['state'] = 'idle_presence'
         robot_context['continue_conversation'] =  False
         robot_context['proactive_question'] =  ''
@@ -291,6 +297,7 @@ def process_transition(transition, params={}):
             server.dump_conversation_db(robot_context['username']) # Update conversation history database
         except Exception as e:
             logger.warning(f'Could not dump conversation database. {str(e)}') 
+
 
     # Handle a proactive question
     elif transition == 'proactive2processingquery':
@@ -320,7 +327,7 @@ def process_transition(transition, params={}):
                         )
                     )
                 except Exception as e: # Unable to connect to the server: play error msg
-                    logger.error(f'Could not make the query. {str(e)}')
+                    logger.error(f'Could not make the proactive query. {str(e)}')
 
                     robot_context['continue_conversation'] = False
                     robot_context['proactive_question'] = ''
@@ -328,7 +335,6 @@ def process_transition(transition, params={}):
                     leds.set(LedState.breath((255,0,0))) # set breath red animation
                     speaker.start(connection_error_audio)
 
-                    proactive.update('abort', 'how_are_you', {'type': params['type'], 'username': robot_context['username']})
                 else: # Asked question
                     robot_context['continue_conversation'] = True
                     robot_context['state'] = 'speaking'
@@ -336,9 +342,6 @@ def process_transition(transition, params={}):
                     speaker.start(response.audio)
 
                     proactive.update('confirm', 'how_are_you', {'type': params['type'], 'username': robot_context['username']})
-
-            else: # In a conversation: discard the proactive question
-                proactive.update('abort', 'how_are_you', {'type': params['type'], 'username': robot_context['username']})
             
         elif params['question'] == 'who_are_you':
             if robot_context['state'] == 'listening':
@@ -357,7 +360,7 @@ def process_transition(transition, params={}):
                         )
                     )
                 except Exception as e: # Error in server connection
-                    logger.error(f'TTS failed. {str(e)}')
+                    logger.error(f'Could not make the proactive query. {str(e)}')
 
                     robot_context['continue_conversation'] = False
                     robot_context['proactive_question'] = ''
@@ -365,7 +368,6 @@ def process_transition(transition, params={}):
                     leds.set(LedState.breath((255,0,0))) # red breath animation
                     speaker.start(connection_error_audio)
 
-                    proactive.update('abort', 'who_are_you')
                 else:
                     robot_context['proactive_question'] = 'who_are_you_response'
                     robot_context['continue_conversation'] = True
@@ -378,8 +380,6 @@ def process_transition(transition, params={}):
                         logger.warning(f'Could not load conversation history. {str(e)}') 
 
                     proactive.update('confirm', 'who_are_you')
-            else:
-                proactive.update('abort', 'who_are_you')
 
 
     # Record new user face
