@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 
 from .google_api import speech_to_text, text_to_speech
-from .openai_api import generate_response, load_conversation_history, save_conversation_history
+from .openai_api import generate_response, load_conversation_history, save_conversation_history, clear_conversation_history
 
 logger = logging.getLogger('Server')
 logger.setLevel(logging.DEBUG)
@@ -98,5 +98,6 @@ def load_conversation_db(username):
 def dump_conversation_db(username):
     # Dump conversation history for the user, update database
     save_conversation_history(username)
+    clear_conversation_history() # Clear conversation history in-RAM
 
     logger.info(f'Conversation history of {username} updated to file database')

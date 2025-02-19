@@ -168,6 +168,7 @@ ibm-credentials.env
 
 # Conversation files
 conversations_db.json
+conversations_unknown_db.json
 
 
 # Other
