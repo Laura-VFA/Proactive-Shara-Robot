@@ -55,6 +55,8 @@ def wf_event_handler(event, usernames=None):
             robot_context['username'] = known_names[0]
             logger.info(f"Username updated to {robot_context['username']}")
 
+            proactive.update('sensor', 'close_face_recognized', args={'username': robot_context['username']})
+
         elif None in usernames and usernames[None] >= 3: # Detect 3 unknown in a row
             proactive.update('sensor', 'unknown_face')
 
@@ -117,6 +119,7 @@ def proactive_service_event_handler(event, params={}):
 
     if event == 'ask_how_are_you':
         notification ['params']['question'] = 'how_are_you'
+        notification['params']['type'] = params['type']
         notifications.put(notification)
     
     elif event == 'ask_who_are_you':
@@ -210,6 +213,7 @@ def process_transition(transition, params={}):
                     if response.action == 'record_face':
                         robot_context['username'] = response.username
                         rf.start(response.username)
+                        proactive.update('confirm', 'recorded_face', {'username': response.username})
 
                 robot_context['continue_conversation'] = response.continue_conversation
                 robot_context['proactive_question'] = ''
@@ -294,13 +298,19 @@ def process_transition(transition, params={}):
         logger.info(f"Proactive question: {params['question']}")
 
         if params['question'] == 'how_are_you':
-            if robot_context['state'] == 'idle_presence':
+            if robot_context['state'] in ['idle_presence', 'listening']:
                 robot_context['state'] = 'processing_query'
                 leds.set(LedState.static_color((0,0,0))) # put black static color
 
                 # Interrupt services
                 wf.stop()
-                pd.stop()
+                pd.stop() #TODO check if it's necessary from listening state
+                mic.stop()
+
+                try:
+                    server.load_conversation_db(robot_context['username']) # Load conversation history for that user
+                except Exception as e:
+                    logger.warning(f'Could not load conversation history. {str(e)}') 
 
                 try:
                     response = server.proactive_query( # Make the query to the cloud
@@ -318,21 +328,17 @@ def process_transition(transition, params={}):
                     leds.set(LedState.breath((255,0,0))) # set breath red animation
                     speaker.start(connection_error_audio)
 
-                    proactive.update('abort', 'how_are_you')
-                else:
+                    proactive.update('abort', 'how_are_you', {'type': params['type'], 'username': robot_context['username']})
+                else: # Asked question
                     robot_context['continue_conversation'] = True
                     robot_context['state'] = 'speaking'
                     leds.set(LedState.breath((52,158,235))) # light blue led breath animation
                     speaker.start(response.audio)
-                    try:
-                        server.load_conversation_db(robot_context['username']) # Load conversation history for that user
-                    except Exception as e:
-                        logger.warning(f'Could not load conversation history. {str(e)}') 
 
-                    proactive.update('confirm', 'how_are_you')
+                    proactive.update('confirm', 'how_are_you', {'type': params['type'], 'username': robot_context['username']})
 
-            else:
-                proactive.update('abort', 'how_are_you')
+            else: # In a conversation: discard the proactive question
+                proactive.update('abort', 'how_are_you', {'type': params['type'], 'username': robot_context['username']})
             
         elif params['question'] == 'who_are_you':
             if robot_context['state'] == 'listening':

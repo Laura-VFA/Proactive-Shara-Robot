@@ -62,7 +62,7 @@ For executing SHARA, you only have to run from root repo directory:
 ```bash
 python3 main.py
 ```
-*➡️**Note**: proactive_phrases.json and shara_prompt.txt contain instructions **totally in spanish**, so if you want SHARA to speak in a different language, teach it your language by changing these files in your language. She will be happy to learn it 😊*
+*➡️**Note**: shara_prompt.txt contain instructions **totally in spanish**, so if you want SHARA to speak in a different language, teach it your language by changing the necessary files in your language (prompt and google lang). She will be happy to learn it 😊*
 
 And that's how you construct your own affective social robot! 🤖❤️👩🏻
 
