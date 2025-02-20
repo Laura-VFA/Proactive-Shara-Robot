@@ -46,7 +46,25 @@ def save_conversation_history(username, filename="files/conversations_db.json"):
         # Save conversation history to file
         with open(filename, "w", encoding="utf-8") as file:
             json.dump(conversation_dict, file, ensure_ascii=False, indent=4)
+    
+    else: # Save conversation history to unknown user database. -- ONLY FOR TESTING PURPOSES --
+        try:
+            with open('files/conversations_unknown_db.json', "r", encoding="utf-8") as file:
+                try:
+                    conversation = json.load(file)
+                except json.JSONDecodeError:
+                    conversation = [] 
+        except FileNotFoundError:
+            conversation = [] 
 
+        conversation.extend(conversation_history)
+
+        with open('files/conversations_unknown_db.json', "w", encoding="utf-8") as file:
+            json.dump(conversation, file, ensure_ascii=False, indent=4)
+
+# Clear conversation history in-RAM (temporal context conversation)
+def clear_conversation_history():
+    conversation_history.clear()
 
 
 shara_prompt = load_prompt()
