@@ -3,7 +3,9 @@ from datetime import datetime
 from openai import OpenAI  
 
 client = OpenAI()
-conversation_history = []
+
+prev_conversation_history = [] # Conversation history from previous sessions (from file)
+current_conversation_history = [] # Conversation history from current session (new current interaction)
 
 # Load prompt from file
 def load_prompt(filename="files/shara_prompt.txt"):
@@ -17,18 +19,18 @@ def load_tools(filename="files/tools_config.json"):
 
 # Load and save conversation history
 def load_conversation_history(username, filename="files/conversations_db.json"):
-    global conversation_history
+    global prev_conversation_history, current_conversation_history
 
     if username:
         try:
             with open(filename, "r", encoding="utf-8") as file:
                 conversation_dict = json.load(file)
-                conversation_history = conversation_dict.get(username, [])
+                prev_conversation_history = conversation_dict.get(username, [])
         except (FileNotFoundError, json.JSONDecodeError):
-            conversation_history = []
+            prev_conversation_history = []
     
     else:
-        conversation_history = []
+        prev_conversation_history = []
 
 def save_conversation_history(username, filename="files/conversations_db.json"):
     if username: # Save conversation history only if username is provided
@@ -38,10 +40,10 @@ def save_conversation_history(username, filename="files/conversations_db.json"):
             with open(filename, "r", encoding="utf-8") as file:
                 conversation_dict = json.load(file)
         except (FileNotFoundError, json.JSONDecodeError):
-            pass
+            conversation_dict = {}
 
         # Update conversation history
-        conversation_dict[username] = conversation_history
+        conversation_dict[username] = prev_conversation_history + current_conversation_history
 
         # Save conversation history to file
         with open(filename, "w", encoding="utf-8") as file:
@@ -57,14 +59,18 @@ def save_conversation_history(username, filename="files/conversations_db.json"):
         except FileNotFoundError:
             conversation = [] 
 
-        conversation.extend(conversation_history)
+        conversation.extend(current_conversation_history)
 
         with open('files/conversations_unknown_db.json', "w", encoding="utf-8") as file:
             json.dump(conversation, file, ensure_ascii=False, indent=4)
 
+def get_full_conversation_history():
+    return prev_conversation_history + current_conversation_history
+
 # Clear conversation history in-RAM (temporal context conversation)
 def clear_conversation_history():
-    conversation_history.clear()
+    prev_conversation_history.clear()
+    current_conversation_history.clear()
 
 
 shara_prompt = load_prompt()
@@ -98,19 +104,27 @@ def handle_tool_call(tool_call, context_data):
         else:
             result = 'False'
     
+    elif tool_name == "set_username":
+        username = args.get("username", 'Desconocido')
+        if username != 'Desconocido':
+            result = 'True'
+            robot_action = {"action": "set_username", "username": args['username']}
+        else:
+            result = 'False'
+    
     return result, robot_action
 
 
 def build_messages(input_text, context_data):
     ''' Build messages with conversation history '''
 
-    messages = [{"role": "developer", "content": shara_prompt}] + conversation_history # include conversation history
+    messages = [{"role": "developer", "content": shara_prompt}] + prev_conversation_history + current_conversation_history # include previous conversation history
     user_message = {"role": "user", "content": json.dumps({**context_data,
                                                            "user_input": input_text,
                                                            "timestamp": datetime.now().strftime("%d-%m-%Y %H:%M")}, ensure_ascii=False)}
 
     messages.append(user_message)
-    conversation_history.append(user_message)
+    current_conversation_history.append(user_message)
 
     return messages
 
@@ -118,9 +132,14 @@ def build_messages(input_text, context_data):
 def get_tools_for_context(context_data):
     ''' Return tools to use based on context data '''
     # Filter who_are_you proactive question (avoid unnecessary record_face tool)
-    tools_to_use = tools if context_data.get("proactive_question") == "who_are_you_response" else [
-        tool for tool in tools if tool["function"]["name"] != "record_face"
-    ]
+    pq = context_data.get("proactive_question", None)
+    tools_to_use = []
+
+    if pq == "who_are_you_response":
+        tools_to_use = [t for t in tools if t["function"]["name"] == "record_face"]
+    
+    elif pq == "casual_ask_username":
+        tools_to_use = [t for t in tools if t["function"]["name"] == "set_username"]
 
     return tools_to_use
 
@@ -156,7 +175,7 @@ def generate_response(input_text, context_data={}):
     response_text = response.choices[0].message.content
 
     # Add response to conversation history
-    conversation_history.append({"role": "assistant", "content": response_text})
+    current_conversation_history.append({"role": "assistant", "content": response_text})
 
     try:
         robot_context = json.loads(response_text)

@@ -16,4 +16,24 @@
             "required": ["username"]
         }
     }
-}]
+},
+{
+    "type": "function",
+    "function": {
+      "name": "set_username",
+      "description": "Set the user name in the system. This function should be called if the user explicitly provides their name in conversation (if the user response is vague, avoid calling this function), to update the username and load conversation from DB.",
+      "strict": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "The name of the current user, which should be a valid name (e.g., 'Luisa', 'John Doe')."
+          }
+        },
+        "additionalProperties": false,
+        "required": ["username"]
+      }
+    }
+  }
+]

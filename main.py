@@ -22,7 +22,8 @@ robot_context = { # Eva status & knowledge of the environment
     'state':'idle', 
     'username': None, 
     'continue_conversation': False, 
-    'proactive_question': ''
+    'proactive_question': '',
+    'unknown_user_interactions': 0
 }
 
 notifications = queue.Queue() # Transition state queue
@@ -214,6 +215,17 @@ def process_transition(transition, params={}):
                         robot_context['username'] = response.username
                         rf.start(response.username)
                         proactive.update('confirm', 'recorded_face', {'username': response.username})
+                    
+                    elif response.action == 'set_username':
+                        logger.info(f'Updating username to {response.username} (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})')
+                        
+                        robot_context['username'] = response.username
+                        robot_context['unknown_user_interactions'] = 0 # Reset unknown user interactions counter
+                        try:
+                            server.load_conversation_db(robot_context['username'])
+                        except Exception as e:
+                            logger.warning(f'Could not load conversation history. {str(e)}') 
+
 
                 robot_context['continue_conversation'] = response.continue_conversation
                 robot_context['proactive_question'] = ''
@@ -223,6 +235,14 @@ def process_transition(transition, params={}):
                 eyes.set(response.robot_mood)
                 leds.set(LedState.breath((52,158,235))) # light blue breath
                 speaker.start(response.audio)
+
+                if not robot_context['username']: # Unknown user
+                    robot_context['unknown_user_interactions'] += 1
+
+                    if robot_context['unknown_user_interactions'] >= 1: # consecutive interactions with unknown user
+                        robot_context['proactive_question'] = 'casual_ask_username'
+
+                        logger.info(f'Time to ask casual_ask_username (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})')
 
             elif robot_context['continue_conversation']: # Avoid end the conversation due to noises
                 logger.info(f'Not text in audio, continuing conversation')
@@ -271,6 +291,7 @@ def process_transition(transition, params={}):
         robot_context['username'] = None
         robot_context['proactive_question'] = ''
         robot_context['continue_conversation'] = False
+        robot_context['unknown_user_interactions'] = 0
         eyes.set('neutral')
         leds.set(LedState.static_color((0,0,0))) # put black static color
         rf.stop()
@@ -291,6 +312,7 @@ def process_transition(transition, params={}):
         robot_context['username'] = None
         robot_context['proactive_question'] = ''
         robot_context['continue_conversation'] = False
+        robot_context['unknown_user_interactions'] = 0
         eyes.set('neutral')
         leds.set(LedState.static_color((0,0,0))) # put black static color
         mic.stop()
