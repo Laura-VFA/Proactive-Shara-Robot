@@ -11,6 +11,7 @@ from services.leds import ArrayLed, LedState
 from services.mic import Recorder
 from services.proactive_service import ProactiveService
 from services.speaker import Speaker
+from services.touchscreen import TouchScreen
 
 
 logging.config.fileConfig('files/logging.conf')
@@ -109,6 +110,10 @@ def speaker_event_handler(event):
         
         else:
             notifications.put({'transition': 'speaking2idle_presence'})
+
+def touchscreen_event_handler(event):
+    if event == 'shutdown':
+        notifications.put({'transition': 'shutdown'})
 
 def proactive_service_event_handler(event, params={}):
     notification = {
@@ -423,7 +428,6 @@ def process_transition(transition, params={}):
         logger.info(f'Transition {transition} discarded')
 
 
-
 if __name__ == '__main__':
     
     leds = ArrayLed()
@@ -438,8 +442,9 @@ if __name__ == '__main__':
 
     speaker = Speaker(speaker_event_handler)
     mic = Recorder(mic_event_handler)
+    touch = TouchScreen(touchscreen_event_handler)
 
-
+    touch.start()
     pd.start()
 
     logger.info('Ready')
@@ -447,18 +452,34 @@ if __name__ == '__main__':
         while True:
             notification = notifications.get()
 
+            if notification.get('transition') == 'shutdown':
+                break # Finish the execution due to finish event
+
             process_transition(**notification)
+
     except KeyboardInterrupt:
         pass
 
-    server.dump_conversation_db(robot_context['username']) # dump in-RAM conversation history before exit
+    finally:
+        logger.info("Interruption detected. Stopping and shutting down the robot...")
+    
+        with open('files/powerdown_sound.wav', 'rb') as f:
+            powerdown_audio = f.read()
+        
+        speaker.start(powerdown_audio) # play goodbye audio
 
-    wf.stop()
-    rf.stop()
-    pd.stop()
-    mic.destroy()
-    speaker.destroy()
-    leds.stop()
-    eyes.stop()
+        touch.stop()
 
-    logger.info('Stopped')
+        server.dump_conversation_db(robot_context['username']) # dump in-RAM conversation history before exit
+
+        eyes.set('neutral_closed') # close eyes animation
+
+        wf.stop()
+        rf.stop()
+        pd.stop()
+        mic.destroy()
+        speaker.destroy()
+        leds.stop()
+        eyes.stop()
+
+        logger.info('Stopped')
