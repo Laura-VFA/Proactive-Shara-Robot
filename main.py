@@ -217,7 +217,7 @@ def process_transition(transition, params={}):
                         proactive.update('confirm', 'recorded_face', {'username': response.username})
                     
                     elif response.action == 'set_username':
-                        logger.info(f'Updating username to {response.username} (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})')
+                        logger.info(f"Updating username to {response.username} (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})")
                         
                         robot_context['username'] = response.username
                         robot_context['unknown_user_interactions'] = 0 # Reset unknown user interactions counter
@@ -242,7 +242,7 @@ def process_transition(transition, params={}):
                     if robot_context['unknown_user_interactions'] >= 1: # consecutive interactions with unknown user
                         robot_context['proactive_question'] = 'casual_ask_username'
 
-                        logger.info(f'Time to ask casual_ask_username (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})')
+                        logger.info(f"Time to ask casual_ask_username (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})")
 
             elif robot_context['continue_conversation']: # Avoid end the conversation due to noises
                 logger.info(f'Not text in audio, continuing conversation')
