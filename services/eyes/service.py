@@ -78,7 +78,7 @@ class Eyes():
                 cv2.imshow("window", canvas)
 
             except queue.Empty: # "A lot" of time without new transitions/faces in the queue
-                if time.time() > next_blink: # blink time
+                if time.time() > next_blink and '_closed' not in self.current_face: # blink time (if the face is not a closed face)
                     current_face = self.current_face
 
                     with self.lock:
