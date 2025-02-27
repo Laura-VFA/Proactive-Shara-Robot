@@ -19,7 +19,7 @@ def load_tools(filename="files/tools_config.json"):
 
 # Load and save conversation history
 def load_conversation_history(username, filename="files/conversations_db.json"):
-    global prev_conversation_history, current_conversation_history
+    global prev_conversation_history
 
     if username:
         try:
@@ -33,36 +33,37 @@ def load_conversation_history(username, filename="files/conversations_db.json"):
         prev_conversation_history = []
 
 def save_conversation_history(username, filename="files/conversations_db.json"):
-    if username: # Save conversation history only if username is provided
-        conversation_dict = {}
-
-        try:
-            with open(filename, "r", encoding="utf-8") as file:
-                conversation_dict = json.load(file)
-        except (FileNotFoundError, json.JSONDecodeError):
+    if current_conversation_history: # Save only if there is conversation history to save
+        if username: # Save conversation history only if username is provided
             conversation_dict = {}
 
-        # Update conversation history
-        conversation_dict[username] = prev_conversation_history + current_conversation_history
+            try:
+                with open(filename, "r", encoding="utf-8") as file:
+                    conversation_dict = json.load(file)
+            except (FileNotFoundError, json.JSONDecodeError):
+                conversation_dict = {}
 
-        # Save conversation history to file
-        with open(filename, "w", encoding="utf-8") as file:
-            json.dump(conversation_dict, file, ensure_ascii=False, indent=4)
-    
-    else: # Save conversation history to unknown user database. -- ONLY FOR TESTING PURPOSES --
-        try:
-            with open('files/conversations_unknown_db.json', "r", encoding="utf-8") as file:
-                try:
-                    conversation = json.load(file)
-                except json.JSONDecodeError:
-                    conversation = [] 
-        except FileNotFoundError:
-            conversation = [] 
+            # Update conversation history
+            conversation_dict[username].extend(current_conversation_history)
 
-        conversation.extend(current_conversation_history)
+            # Save conversation history to file
+            with open(filename, "w", encoding="utf-8") as file:
+                json.dump(conversation_dict, file, ensure_ascii=False, indent=4)
+        
+        else: # Save conversation history to unknown user database. -- ONLY FOR TESTING PURPOSES --
+            try:
+                with open('files/conversations_unknown_db.json', "r", encoding="utf-8") as file:
+                    try:
+                        conversation = json.load(file)
+                    except json.JSONDecodeError:
+                        conversation = [] 
+            except FileNotFoundError:
+                conversation = [] 
 
-        with open('files/conversations_unknown_db.json', "w", encoding="utf-8") as file:
-            json.dump(conversation, file, ensure_ascii=False, indent=4)
+            conversation.extend(current_conversation_history)
+
+            with open('files/conversations_unknown_db.json', "w", encoding="utf-8") as file:
+                json.dump(conversation, file, ensure_ascii=False, indent=4)
 
 def get_full_conversation_history():
     return prev_conversation_history + current_conversation_history
