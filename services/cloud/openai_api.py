@@ -139,7 +139,7 @@ def get_tools_for_context(context_data):
     if pq == "who_are_you_response":
         tools_to_use = [t for t in tools if t["function"]["name"] == "record_face"]
     
-    elif pq == "casual_ask_username":
+    elif pq == "casual_ask_known_username":
         tools_to_use = [t for t in tools if t["function"]["name"] == "set_username"]
 
     return tools_to_use

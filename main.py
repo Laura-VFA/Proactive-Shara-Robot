@@ -245,9 +245,9 @@ def process_transition(transition, params={}):
                     robot_context['unknown_user_interactions'] += 1
 
                     if robot_context['unknown_user_interactions'] >= 1: # consecutive interactions with unknown user
-                        robot_context['proactive_question'] = 'casual_ask_username'
+                        robot_context['proactive_question'] = 'casual_ask_known_username'
 
-                        logger.info(f"Time to ask casual_ask_username (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})")
+                        logger.info(f"Time to ask casual_ask_known_username (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})")
 
             elif robot_context['continue_conversation']: # Avoid end the conversation due to noises
                 logger.info(f'Not text in audio, continuing conversation')
