@@ -44,7 +44,7 @@ def save_conversation_history(username, filename="files/conversations_db.json"):
                 conversation_dict = {}
 
             # Update conversation history
-            conversation_dict[username].extend(current_conversation_history)
+            conversation_dict.setdefault(username, []).extend(current_conversation_history)
 
             # Save conversation history to file
             with open(filename, "w", encoding="utf-8") as file:
