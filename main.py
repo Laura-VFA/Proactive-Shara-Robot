@@ -2,6 +2,7 @@ import logging
 import logging.config
 import queue
 import threading
+import concurrent.futures
 
 from services.camera_services import (FaceDB, PresenceDetector, RecordFace,
                                      Wakeface)
@@ -31,6 +32,9 @@ notifications = queue.Queue() # Transition state queue
 
 listen_timer = None # Listening timeout handler
 DELAY_TIMEOUT = 5 # in sec
+
+global_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10) # Global executor for async tasks (server queries)
+SERVER_QUERY_TIMEOUT = 15 # in sec
 
 # Preload of error audios
 with open('files/connection_error.wav', 'rb') as f:
@@ -197,14 +201,21 @@ def process_transition(transition, params={}):
 
         audio = params['audio']
 
+        future = global_executor.submit(
+            server.query,  # Make the query to the cloud
+            server.Request(audio, username=robot_context['username'], proactive_question=robot_context['proactive_question'])
+        )
         try:
-            response = server.query( # Make the query to the cloud
-                server.Request(
-                    audio, 
-                    username=robot_context['username'], 
-                    proactive_question=robot_context['proactive_question']
-                )
-            )
+            response = future.result(timeout=SERVER_QUERY_TIMEOUT) # Wait for the response
+        except concurrent.futures.TimeoutError: # Timeout error: play error msg
+            logger.error('Timeout error in query processing')
+
+            robot_context['continue_conversation'] = False
+            robot_context['proactive_question'] = ''
+            robot_context['state'] = 'speaking'
+            leds.set(LedState.breath((255,0,0))) # set breath red animation
+            speaker.start(connection_error_audio)
+
         except Exception as e: # Unable to connect to the server: play error msg
             logger.error(f'Could not make the query. {str(e)}')
 
@@ -213,6 +224,7 @@ def process_transition(transition, params={}):
             robot_context['state'] = 'speaking'
             leds.set(LedState.breath((255,0,0))) # set breath red animation
             speaker.start(connection_error_audio)
+
         else:
             if response:
                 if response.action: # Execute associated action
@@ -346,13 +358,26 @@ def process_transition(transition, params={}):
                 except Exception as e:
                     logger.warning(f'Could not load conversation history. {str(e)}') 
 
-                try:
-                    response = server.proactive_query( # Make the query to the cloud
-                        server.Request(
-                            username=robot_context['username'], 
-                            proactive_question='how_are_you'
-                        )
+                future = global_executor.submit(
+                    server.proactive_query, # Make the query to the cloud
+                    server.Request(
+                        username=robot_context['username'], 
+                        proactive_question='how_are_you'
                     )
+                )
+
+                try:
+                    response = future.result(timeout=SERVER_QUERY_TIMEOUT) # Wait for the response
+
+                except concurrent.futures.TimeoutError: # Timeout error: play error msg
+                    logger.error('Timeout error in proactive query processing')
+
+                    robot_context['continue_conversation'] = False
+                    robot_context['proactive_question'] = ''
+                    robot_context['state'] = 'speaking'
+                    leds.set(LedState.breath((255,0,0))) # set breath red animation
+                    speaker.start(connection_error_audio)
+
                 except Exception as e: # Unable to connect to the server: play error msg
                     logger.error(f'Could not make the proactive query. {str(e)}')
 
@@ -379,13 +404,26 @@ def process_transition(transition, params={}):
                 mic.stop()
                 wf.stop()
 
-                try:
-                    response = server.proactive_query( # Make empty query to the cloud
-                        server.Request(
-                            username=robot_context['username'], 
-                            proactive_question='who_are_you'
-                        )
+                future = global_executor.submit(
+                    server.proactive_query, # Make the query to the cloud
+                    server.Request(
+                        username=robot_context['username'], 
+                        proactive_question='who_are_you'
                     )
+                )
+
+                try:
+                    response = future.result(timeout=SERVER_QUERY_TIMEOUT) # Wait for the response
+
+                except concurrent.futures.TimeoutError: # Timeout error: play error ms
+                    logger.error('Timeout error in proactive query processing')
+
+                    robot_context['continue_conversation'] = False
+                    robot_context['proactive_question'] = ''
+                    robot_context['state'] = 'speaking'
+                    leds.set(LedState.breath((255,0,0)))
+                    speaker.start(connection_error_audio)
+
                 except Exception as e: # Error in server connection
                     logger.error(f'Could not make the proactive query. {str(e)}')
 
@@ -473,6 +511,8 @@ if __name__ == '__main__':
         server.dump_conversation_db(robot_context['username']) # dump in-RAM conversation history before exit
 
         eyes.set('neutral_closed') # close eyes animation
+
+        global_executor.shutdown(wait=False) # shutdown global executor
 
         wf.stop()
         rf.stop()
