@@ -14,3 +14,4 @@ tflite-support==0.1.0a1
 scipy==1.15.1
 openai==1.60.2
 evdev==1.9.1
+numpy==1.26.4
