@@ -1,7 +1,6 @@
 # Google services wrapper
-# (TTS, STT and translation)
+# (TTS, STT)
 from google.cloud import speech, texttospeech
-from google.cloud import translate_v2 as translate
 
 
 # TTS
@@ -24,10 +23,6 @@ stt_config = speech.RecognitionConfig(
     language_code="es-ES"
 )
 
-# Translator 
-translate_client = translate.Client()
-
-
 
 def speech_to_text(audio_bytes):
     audio = speech.RecognitionAudio(content=audio_bytes)
@@ -43,12 +38,3 @@ def text_to_speech(text):
     )
 
     return response.audio_content
-
-def translate_to(text, source_lang='es', target_lang='en'):
-    result = translate_client.translate(
-        text,
-        source_language=source_lang,
-        target_language=target_lang
-    )
-
-    return result["translatedText"]
