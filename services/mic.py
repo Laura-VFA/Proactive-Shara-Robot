@@ -25,6 +25,8 @@ class Recorder:
         self.prev_audio = deque(maxlen=int(prev_audio_size * rate/chunk_size)) 
         
         self.p = pyaudio.PyAudio()
+        self.input_device_index = self._get_input_sound_index()
+
         self.model = load_silero_vad()  # Load Silero VAD model
         self.stream = None
 
@@ -37,6 +39,16 @@ class Recorder:
         self.audio_buffer = deque(maxlen=int(rate / chunk_size * 2))  # Buffer for 2 seconds of audio (Silero needs minumun audio buffer size)
 
         self.logger.info('Ready')
+    
+    def _get_input_sound_index(self, device_name="respeaker"):
+        # Check all sound devices and return the index of the Respeaker device (or the looked device)
+        for i in range(self.p.get_device_count()):
+            dev_info = self.p.get_device_info_by_index(i)
+            if device_name in dev_info.get("name", "").lower():
+                self.logger.info(f"{device_name} detected in index {i}: {dev_info.get('name')}")
+                return i
+        self.logger.error(f"{device_name} not found")
+        return 0
     
     def on_data(self, in_data, frame_count, time_info, flag): # Callback for recorded audio
         is_speech = False
@@ -81,7 +93,7 @@ class Recorder:
                 rate=self.rate,
                 input=True,
                 frames_per_buffer=self.chunk_size,
-                input_device_index=0, # remember to check which index device is Respeaker
+                input_device_index=self.input_device_index,
                 stream_callback=self.on_data)
         
         self._thread = Thread(target=self._run)
