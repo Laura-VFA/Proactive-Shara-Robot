@@ -12,7 +12,7 @@ class ProactiveService:
         self.callback = callback
 
         # Put an alarms to ask for user mood
-        self.next_presence_question_time = datetime.now() + timedelta(minutes=30)
+        self.next_presence_question_time = datetime.now() + timedelta(minutes=60)
         self.logger.info(f"First how_are_you (presence) set at {self.next_presence_question_time}")
 
         self.next_close_face_question_time = {}
