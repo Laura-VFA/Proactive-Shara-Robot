@@ -19,7 +19,7 @@ class ProactiveService:
         try:
             with open('files/conversations_db.json', "r", encoding="utf-8") as file:
                 users = list(json.load(file).keys())
-                self.next_close_face_question_time = {user: datetime.now() + timedelta(minutes=30) for user in users}
+                self.next_close_face_question_time = {user: datetime.now() for user in users}
         except (FileNotFoundError, json.JSONDecodeError):
             pass
         self.logger.info(f"First how_are_you (close faces) set at {self.next_close_face_question_time}")
