@@ -80,10 +80,14 @@ def pd_event_handler(event):
 
     if event == 'person_detected' and robot_context['state'] == 'idle' :
         notifications.put({'transition': 'idle2idle_presence'})
-        proactive.update('sensor', 'presence')
     
     elif event == 'empty_room'  and robot_context['state'] == 'idle_presence' :
         notifications.put({'transition': 'idle_presence2idle'})
+    
+    elif event == 'person_detected_longtime' and robot_context['state'] == 'idle_presence':
+        # User is in the room for a long time without looking at the robot: ask proactive question
+        if not robot_context['username']: # This condition is not needed, but just in case for robustness
+            proactive.update('sensor', 'presence')
 
 def mic_event_handler(event, audio=None):
     global robot_context

@@ -403,6 +403,8 @@ class PresenceDetector(CameraService):
         CameraService.camera.start(self.__class__.__name__)
         fps = FPS().start()
 
+        proactive_presence_frame_count = 0 # Counter to trigger proactive question
+
         while not self.stopped.is_set():
             frame = CameraService.camera.get_color_frame(resize_width=500)
 
@@ -415,13 +417,19 @@ class PresenceDetector(CameraService):
 
             if detections:
                 self.detection_count += 1
+                proactive_presence_frame_count += 1
 
                 if self.detection_count >= 3: # 3 consecutive frames with presence detected
                     self.callback('person_detected')
                     self.detection_count = 0 # Reset counter
+                
+                if proactive_presence_frame_count >= 12: # 12 consecutive frames with presence detected, time to ask proactive question
+                    self.callback('person_detected_longtime')
+                    proactive_presence_frame_count = 0 # Reset counter
 
             else:
                 self.detection_count = 0
+                proactive_presence_frame_count = 0
                 self.callback('empty_room')
             
             fps.update()
