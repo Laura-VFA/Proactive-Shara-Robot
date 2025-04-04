@@ -39,7 +39,7 @@ class ProactiveService:
             elif subtype == 'close_face_recognized':
                 # Timeout, ask 'How are you? to specific user'
                 if (self.next_close_face_question_time[args['username']] - datetime.now()).total_seconds() <= 0: 
-                    self.callback('ask_how_are_you', {'type': 'close_face_recognized'})
+                    self.callback('ask_how_are_you', {'type': 'close_face_recognized', 'username': args['username']})
 
             elif subtype == 'unknown_face': # Ask new user's name
                 self.callback('ask_who_are_you')

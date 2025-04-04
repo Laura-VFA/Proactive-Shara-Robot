@@ -134,6 +134,7 @@ def proactive_service_event_handler(event, params={}):
     if event == 'ask_how_are_you':
         notification ['params']['question'] = 'how_are_you'
         notification['params']['type'] = params['type']
+        notification['params']['username'] = params.get('username', None)
         notifications.put(notification)
     
     elif event == 'ask_who_are_you':
@@ -356,6 +357,8 @@ def process_transition(transition, params={}):
                 wf.stop()
                 pd.stop()
                 mic.stop()
+
+                robot_context['username'] = params.get('username', None) # Get the username from params
 
                 try:
                     server.load_conversation_db(robot_context['username']) # Load conversation history for that user
