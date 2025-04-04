@@ -58,12 +58,13 @@ def wf_event_handler(event, usernames=None):
         if known_names:
             # Sort names by number of consecutive frames recognized
             known_names = sorted(usernames, key=lambda name: usernames[name], reverse=True)
-            robot_context['username'] = known_names[0]
-            logger.info(f"Username updated to {robot_context['username']}")
+            if usernames[known_names[0]] >= 3:
+                robot_context['username'] = known_names[0]
+                logger.info(f"Username updated to {robot_context['username']}")
 
-            proactive.update('sensor', 'close_face_recognized', args={'username': robot_context['username']})
+                proactive.update('sensor', 'close_face_recognized', args={'username': robot_context['username']})
 
-        elif None in usernames and usernames[None] >= 3: # Detect 3 unknown in a row
+        elif None in usernames and usernames[None] >= 15: # Detect 15 unknown in a row
             proactive.update('sensor', 'unknown_face')
 
 def rf_event_handler(event, progress=None):
