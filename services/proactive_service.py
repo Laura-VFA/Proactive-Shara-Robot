@@ -54,6 +54,12 @@ class ProactiveService:
                 if args['username']: # Set new alarm for close face (specific user) 30 minute later
                     self.next_close_face_question_time[args['username']] = datetime.now() + timedelta(minutes=30)
                     self.logger.info(f"Next how_are_you - close_face_recognized ({args['username']}) set at {self.next_close_face_question_time}")
+                
+                else: # Postpone all the known users alarms 10 minutes later (just in case the user doesn't want to talk after presece proactive question and the user is still there)
+                    self.logger.info(f"Postponing all the known users alarms 10 minutes later")
+                    for user in self.next_close_face_question_time.keys():
+                        self.next_close_face_question_time[user] = datetime.now() + timedelta(minutes=10)
+                        self.logger.info(f"Next how_are_you - close_face_recognized postponed 10 min ({user}) set at {self.next_close_face_question_time[user]}")
 
 
         elif type == 'confirm': # Questions asked
