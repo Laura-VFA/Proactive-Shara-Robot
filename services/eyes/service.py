@@ -38,6 +38,14 @@ class Eyes():
     
     def _set(self, face, steps=3):
         if self.current_face != face:
+
+            # Check if the face exists in the directory
+            face_file_path = self.faces_dir / f'{face}.json'
+            
+            if not face_file_path.exists():
+                self.logger.warning(f"Face {face} not found, defaulting to 'neutral'.")
+                face = 'neutral'  # Set neutral face if the target face is not found
+
             target_face = get_face_from_file(self.faces_dir/f'{face}.json')
 
             in_between_faces = get_in_between_faces(self.current_face_points, target_face, steps)
