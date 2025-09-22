@@ -66,6 +66,7 @@ class Eyes():
             self._set(face)
 
     def _run(self):
+        os.system("unclutter -idle 0 -root &") # Hide the cursor
 
         # Initialize the windows
         cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
@@ -103,6 +104,8 @@ class Eyes():
 
         cv2.destroyAllWindows()
         
+        os.system("pkill unclutter") # show the cursor again
+
     def start(self):
         self.thread = Thread(target = self._run)
         self.stopped.clear()
