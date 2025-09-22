@@ -79,7 +79,7 @@ tools = load_tools()
 
 # OpenAI completion arguments configuration
 completion_args = {
-    "model": "gpt-4o-mini",
+    "model": "gpt-4.1-nano",
     "response_format": {'type': "json_object"},
     "store": True,
     "temperature": 1,
