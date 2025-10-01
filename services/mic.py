@@ -8,7 +8,7 @@ from silero_vad import get_speech_timestamps, load_silero_vad
 
 class Recorder:
     def __init__(self, callback, chunk_size=2048, format=pyaudio.paInt16,
-                 channels=1, rate=16000, prev_audio_size=1.0) -> None:
+                 channels=1, rate=16000, prev_audio_size=2.5) -> None:
         self.logger = logging.getLogger('Mic')
         self.logger.setLevel(logging.DEBUG)
 
@@ -36,7 +36,10 @@ class Recorder:
         self.stop_recording = Event()
         self.callback = callback
 
-        self.audio_buffer = deque(maxlen=int(rate / chunk_size * 2))  # Buffer for 2 seconds of audio (Silero needs minumun audio buffer size)
+        self.audio_buffer = deque(maxlen=int(rate / chunk_size * 1.0))  # Buffer for 1 second of audio for faster detection
+        self.process_every_n = 2  # Process every N chunks to reduce CPU load
+        self.chunk_counter = 0
+        self.min_buffer_size = int(rate / chunk_size * 0.5)  # Minimum 0.5 seconds for VAD processing
 
         self.logger.info('Ready')
     
@@ -55,9 +58,13 @@ class Recorder:
 
         # Append incoming data to the buffer
         self.audio_buffer.append(in_data)
+        
+        # Process only every N chunks to reduce CPU usage
+        self.chunk_counter += 1
+        should_process = (self.chunk_counter % self.process_every_n == 0) or self.start_recording.is_set()
 
-        # Process buffer if it contains enough data
-        if len(self.audio_buffer) == self.audio_buffer.maxlen: # reach the max length of the buffer
+        # Process buffer if it contains enough data and it's time to process
+        if should_process and len(self.audio_buffer) >= self.min_buffer_size:
             audio_chunk = np.frombuffer(b''.join(self.audio_buffer), dtype=np.int16).astype(np.float32) / 32768.0 # needed format for Silero VAD
             voiced_timestamps = get_speech_timestamps(audio_chunk, self.model, sampling_rate=self.rate)
 
