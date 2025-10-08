@@ -2,7 +2,7 @@ import logging
 import time
 from dataclasses import dataclass
 
-from .google_api import speech_to_text, text_to_speech
+from .google_api import speech_to_text, text_to_speech, streaming_speech_to_text
 from .openai_api import generate_response, load_conversation_history, save_conversation_history, clear_conversation_history
 
 logger = logging.getLogger('Server')
@@ -28,6 +28,15 @@ class Response:
 
 
 def query(request: Request):
+    """
+    Perform query STT + LLM + TTS
+    
+    Args:
+        request (Request): The user request containing audio and context information.
+
+    Returns:
+        Response: The response object containing audio and context information.
+    """
     # STT
     start_time = time.time()
     request.text = speech_to_text(request.audio)
@@ -64,6 +73,64 @@ def query(request: Request):
         robot_context['robot_mood'] if 'robot_mood' in robot_context and robot_context['robot_mood'] else 'neutral',
         text_response
     )
+
+def query_with_text(request: Request):
+    """Process query with text already transcribed LLM + TTS"""
+    if not request.text:
+        return None
+
+    logger.info(f"Processing query with streaming STT text: '{request.text}'")
+
+    # Set context variables
+    context_variables = {}
+    context_variables["username"] = request.username
+    context_variables["proactive_question"] = request.proactive_question 
+    logger.info(f'Query context :: {context_variables}')
+
+    # Generate the response
+    start_time = time.time()
+    text_response, robot_context = generate_response(request.text, context_variables)
+    logger.info(f'LLM response generated in {time.time() - start_time:.2f} seconds')
+    logger.info(f'Response text :: {text_response}')
+    logger.info(f'Response context :: {robot_context}')
+
+    # TTS
+    start_time = time.time()
+    audio_response = text_to_speech(text_response)
+    logger.info(f"TTS result obtained (response generated in {time.time() - start_time:.2f} seconds)")
+
+    # Send back the response
+    return Response(
+        request,
+        audio_response,
+        robot_context.get('action', None),
+        robot_context.get('username', None),
+        bool(robot_context.get('continue', '')),
+        robot_context['robot_mood'] if 'robot_mood' in robot_context and robot_context['robot_mood'] else 'neutral',
+        text_response
+    )
+
+
+def streaming_stt(audio_generator):
+    """
+    Perform only streaming STT
+    This is used to get the transcript quickly while maintaining proper state synchronization
+    
+    Args:
+        audio_generator: Generator that yields audio chunks from the microphone
+        
+    Returns:
+        str: Transcript from streaming STT, or empty string if no speech detected
+    """
+    transcript, silence_detection_time = streaming_speech_to_text(audio_generator)
+    
+    if silence_detection_time is not None:
+        logger.info(f"Streaming STT result (silence detection: {silence_detection_time:.3f} seconds) :: '{transcript}'")
+    else:
+        logger.info(f"Streaming STT result (no final result) :: '{transcript}'")
+    
+    return transcript
+
 
 def proactive_query(request: Request):
     # Same as query but with empty input_text and without STT

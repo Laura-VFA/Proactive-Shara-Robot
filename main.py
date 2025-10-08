@@ -36,6 +36,9 @@ DELAY_TIMEOUT = 5 # in sec
 global_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10) # Global executor for async tasks (server queries)
 SERVER_QUERY_TIMEOUT = 15 # in sec
 
+# Streaming STT state
+streaming_future = None  # Future for streaming STT task
+
 # Preload of error audios
 with open('files/connection_error.wav', 'rb') as f:
     connection_error_audio = f.read()
@@ -188,33 +191,52 @@ def process_transition(transition, params={}):
         robot_context['state'] = 'recording'
         leds.set(LedState.loop((255,255,255))) # set white loop color
         wf.stop()
+        
+        # Load conversation history when user starts talking
         try:
             server.load_conversation_db(robot_context['username']) # Load conversation history for that user
         except Exception as e:
-            logger.warning(f'Could not load conversation history. {str(e)}') 
+            logger.warning(f'Could not load conversation history. {str(e)}')
+        
+        # Enable mic streaming for STT only 
+        mic.enable_streaming()
+        audio_generator = mic.get_audio_generator()
+        
+        # Start streaming STT in background
+        global streaming_future
+        streaming_future = global_executor.submit(
+            server.streaming_stt,  # Only STT streaming
+            audio_generator
+        )
     
     # User in conversation starts talking
     elif transition == 'listening_without_cam2recording' and robot_context['state'] == 'listening_without_cam':
         robot_context['state'] = 'recording'
         leds.set(LedState.loop((255,255,255))) # set white loop color
         listen_timer.cancel()
+        
+        # Enable streaming STT
+        mic.enable_streaming()
+        audio_generator = mic.get_audio_generator()
+        
+        # Start streaming STT in background
+        streaming_future = global_executor.submit(
+            server.streaming_stt,  # Only STT streaming
+            audio_generator
+        )
 
-    # User finished talking: sending audio to server
+    # User finished talking: generate robot response
     elif transition == 'recording2processingquery' and robot_context['state'] == 'recording':
         robot_context['state'] = 'processing_query'
         leds.set(LedState.static_color((0,0,0)))
+        mic.disable_streaming() # Disable streaming
         mic.stop()
 
-        audio = params['audio']
-
-        future = global_executor.submit(
-            server.query,  # Make the query to the cloud
-            server.Request(audio, username=robot_context['username'], proactive_question=robot_context['proactive_question'])
-        )
+        # Wait for streaming STT result
         try:
-            response = future.result(timeout=SERVER_QUERY_TIMEOUT) # Wait for the response
+            transcript = streaming_future.result(timeout=SERVER_QUERY_TIMEOUT) # Wait for the streaming STT result
         except concurrent.futures.TimeoutError: # Timeout error: play error msg
-            logger.error('Timeout error in query processing')
+            logger.error('Timeout error in streaming STT processing')
 
             robot_context['continue_conversation'] = False
             robot_context['proactive_question'] = ''
@@ -223,7 +245,7 @@ def process_transition(transition, params={}):
             speaker.start(connection_error_audio)
 
         except Exception as e: # Unable to connect to the server: play error msg
-            logger.error(f'Could not make the query. {str(e)}')
+            logger.error(f'Could not make the streaming STT. {str(e)}')
 
             robot_context['continue_conversation'] = False
             robot_context['proactive_question'] = ''
@@ -232,40 +254,97 @@ def process_transition(transition, params={}):
             speaker.start(connection_error_audio)
 
         else:
-            if response:
-                if response.action: # Execute associated action
-                    if response.action == 'record_face':
-                        robot_context['username'] = response.username
-                        rf.start(response.username)
-                        proactive.update('confirm', 'recorded_face', {'username': response.username})
-                    
-                    elif response.action == 'set_username':
-                        logger.info(f"Updating username to {response.username} (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})")
-                        
-                        robot_context['username'] = response.username
-                        robot_context['unknown_user_interactions'] = 0 # Reset unknown user interactions counter
-                        try:
-                            server.load_conversation_db(robot_context['username'])
-                        except Exception as e:
-                            logger.warning(f'Could not load conversation history. {str(e)}') 
+            if transcript:           
+                # Process the query with text already transcribed (LLM + TTS)
+                future = global_executor.submit(
+                    server.query_with_text,
+                    server.Request(
+                        text=transcript,
+                        username=robot_context['username'],
+                        proactive_question=robot_context['proactive_question']
+                    )
+                )
+                
+                try:
+                    response = future.result(timeout=SERVER_QUERY_TIMEOUT) # Wait for the response with timeout
+                except concurrent.futures.TimeoutError: # Timeout error: play error msg
+                    logger.error('Timeout error in query_with_text processing')
 
+                    robot_context['continue_conversation'] = False
+                    robot_context['proactive_question'] = ''
+                    robot_context['state'] = 'speaking'
+                    leds.set(LedState.breath((255,0,0))) # set breath red animation
+                    speaker.start(connection_error_audio)
 
-                robot_context['continue_conversation'] = response.continue_conversation
-                robot_context['proactive_question'] = ''
+                except Exception as e:
+                    logger.error(f'Could not process query with text. {str(e)}')
 
-                # Reproduce response                
-                robot_context['state'] = 'speaking'
-                eyes.set(response.robot_mood)
-                leds.set(LedState.breath((52,158,235))) # light blue breath
-                speaker.start(response.audio)
+                    robot_context['continue_conversation'] = False
+                    robot_context['proactive_question'] = ''
+                    robot_context['state'] = 'speaking'
+                    leds.set(LedState.breath((255,0,0))) # set breath red animation
+                    speaker.start(connection_error_audio)
 
-                if not robot_context['username']: # Unknown user
-                    robot_context['unknown_user_interactions'] += 1
+                else:
+                    if response:
+                        if response.action: # Execute associated action
+                            if response.action == 'record_face':
+                                robot_context['username'] = response.username
+                                rf.start(response.username)
+                                proactive.update('confirm', 'recorded_face', {'username': response.username})
+                            
+                            elif response.action == 'set_username':
+                                logger.info(f"Updating username to {response.username} (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})")
+                                
+                                robot_context['username'] = response.username
+                                robot_context['unknown_user_interactions'] = 0 # Reset unknown user interactions counter
+                                try:
+                                    server.load_conversation_db(robot_context['username'])
+                                except Exception as e:
+                                    logger.warning(f'Could not load conversation history. {str(e)}') 
 
-                    if robot_context['unknown_user_interactions'] >= 1: # consecutive interactions with unknown user
-                        robot_context['proactive_question'] = 'casual_ask_known_username'
+                        robot_context['continue_conversation'] = response.continue_conversation
+                        robot_context['proactive_question'] = ''
 
-                        logger.info(f"Time to ask casual_ask_known_username (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})")
+                        # Reproduce response                
+                        robot_context['state'] = 'speaking'
+                        eyes.set(response.robot_mood)
+                        leds.set(LedState.breath((52,158,235))) # light blue breath
+                        speaker.start(response.audio)
+
+                        if not robot_context['username']: # Unknown user
+                            robot_context['unknown_user_interactions'] += 1
+
+                            if robot_context['unknown_user_interactions'] >= 1: # consecutive interactions with unknown user
+                                robot_context['proactive_question'] = 'casual_ask_known_username'
+
+                                logger.info(f"Time to ask casual_ask_known_username (proactive presence conversation - N interactions {robot_context['unknown_user_interactions']})")
+
+                    else: # No response from query_with_text
+                        logger.warning('No response from query_with_text despite having transcript')
+                        if robot_context['continue_conversation']: # Avoid end the conversation due to processing error
+                            logger.info(f'Processing error, continuing conversation')
+                            logger.info(f'Handling transition processing_query2listening_without_cam')
+
+                            robot_context['state'] = 'listening_without_cam'
+                            leds.set(LedState.loop((52,158,235))) # light blue loop
+                            mic.start()
+
+                            # Add a timeout to execute a transition function due to inactivity
+                            listen_timer = threading.Timer(DELAY_TIMEOUT, listen_timeout_handler)
+                            listen_timer.start()
+
+                        else:
+                            logger.info(f'Query processing error, back to idle')
+                            logger.info(f'Handling transition processing_query2idle_presence')
+
+                            robot_context['state'] = 'idle_presence'
+                            robot_context['username'] = None
+                            robot_context['proactive_question'] = ''           
+                            eyes.set('neutral')
+                            leds.set(LedState.static_color((0,0,0))) # put black static color
+                            pd.start()
+                            wf.start()
 
             elif robot_context['continue_conversation']: # Avoid end the conversation due to noises
                 logger.info(f'Not text in audio, continuing conversation')

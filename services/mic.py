@@ -1,4 +1,5 @@
 import logging
+import queue
 from collections import deque
 from threading import Event, Thread
 
@@ -41,6 +42,10 @@ class Recorder:
         self.chunk_counter = 0
         self.min_buffer_size = int(rate / chunk_size * 0.5)  # Minimum 0.5 seconds for VAD processing
 
+        # Streaming attributes
+        self.streaming_enabled = False
+        self.streaming_queue = None
+
         self.logger.info('Ready')
     
     def _get_input_sound_index(self, device_name="respeaker"):
@@ -76,11 +81,35 @@ class Recorder:
                 self.audio2send = []
                 self.start_recording.set()
                 self.audio2send.extend(self.prev_audio)
+                
+                # If streaming is enabled, also send previous audio chunks to streaming queue
+                if self.streaming_enabled and self.streaming_queue is not None:
+                    for prev_chunk in self.prev_audio:
+                        try:
+                            self.streaming_queue.put_nowait(prev_chunk)
+                        except queue.Full:
+                            self.logger.warning('Streaming queue full while adding prev_audio, dropping chunk')
+            
             self.audio2send.append(in_data)
+            
+            # If streaming is enabled, send chunks to streaming queue
+            if self.streaming_enabled and self.streaming_queue is not None:
+                try:
+                    self.streaming_queue.put_nowait(in_data)
+                except queue.Full:
+                    self.logger.warning('Streaming queue full, dropping chunk')
 
-        elif self.start_recording.is_set():
+        elif self.start_recording.is_set(): # Silence detected after voice activity
             self.start_recording.clear()
             self.stop_recording.set()
+            
+            # Signal end of streaming
+            if self.streaming_enabled and self.streaming_queue is not None:
+                try:
+                    self.streaming_queue.put_nowait(None)  # Sentinel value
+                except queue.Full:
+                    pass
+            
             self.prev_audio = deque(maxlen=int(self.prev_audio_size * self.rate/self.chunk_size)) 
             return (in_data, pyaudio.paComplete)
             
@@ -143,3 +172,43 @@ class Recorder:
     def destroy(self):
         self.stop()
         self.p.terminate()
+
+
+    def enable_streaming(self):
+        # Enable streaming mode: audio chunks will be sent to streaming queue
+        if not self.streaming_enabled:
+            self.streaming_queue = queue.Queue(maxsize=100)
+            self.streaming_enabled = True
+            self.logger.info('Streaming enabled')
+    
+    def disable_streaming(self):
+        # Disable streaming mode
+        if self.streaming_enabled:
+            self.streaming_enabled = False
+            if self.streaming_queue is not None:
+                # Clear the queue
+                while not self.streaming_queue.empty():
+                    try:
+                        self.streaming_queue.get_nowait()
+                    except queue.Empty:
+                        break
+            self.streaming_queue = None
+            self.logger.info('Streaming disabled')
+    
+    def get_audio_generator(self):
+        """
+        Generator that yields audio chunks from the streaming queue.
+        Used to feed the STT streaming API
+        
+        Yields:
+            bytes: Audio chunks
+        """
+        if self.streaming_queue is None:
+            self.logger.warning('Streaming queue not initialized')
+            return
+        
+        while True:
+            chunk = self.streaming_queue.get()
+            if chunk is None:  # value to stop
+                break
+            yield chunk
