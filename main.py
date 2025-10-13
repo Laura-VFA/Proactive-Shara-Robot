@@ -229,7 +229,6 @@ def process_transition(transition, params={}):
     elif transition == 'recording2processingquery' and robot_context['state'] == 'recording':
         robot_context['state'] = 'processing_query'
         leds.set(LedState.static_color((0,0,0)))
-        mic.disable_streaming() # Disable streaming
         mic.stop()
 
         # Wait for streaming STT result
@@ -237,6 +236,7 @@ def process_transition(transition, params={}):
             transcript = streaming_future.result(timeout=SERVER_QUERY_TIMEOUT) # Wait for the streaming STT result
         except concurrent.futures.TimeoutError: # Timeout error: play error msg
             logger.error('Timeout error in streaming STT processing')
+            mic.disable_streaming() # Clean up streaming resources
 
             robot_context['continue_conversation'] = False
             robot_context['proactive_question'] = ''
@@ -246,6 +246,7 @@ def process_transition(transition, params={}):
 
         except Exception as e: # Unable to connect to the server: play error msg
             logger.error(f'Could not make the streaming STT. {str(e)}')
+            mic.disable_streaming() # Clean up streaming resources
 
             robot_context['continue_conversation'] = False
             robot_context['proactive_question'] = ''
@@ -254,6 +255,9 @@ def process_transition(transition, params={}):
             speaker.start(connection_error_audio)
 
         else:
+            # Streaming completed successfully, now disable it
+            mic.disable_streaming()
+            
             if transcript:           
                 # Process the query with text already transcribed (LLM + TTS)
                 future = global_executor.submit(
@@ -598,6 +602,11 @@ if __name__ == '__main__':
         server.dump_conversation_db(robot_context['username']) # dump in-RAM conversation history before exit
 
         eyes.set('neutral_closed') # close eyes animation
+
+        # Cancel streaming STT future if still running
+        if streaming_future is not None and not streaming_future.done():
+            streaming_future.cancel()
+            logger.info('Streaming future cancelled')
 
         global_executor.shutdown(wait=False) # shutdown global executor
 
