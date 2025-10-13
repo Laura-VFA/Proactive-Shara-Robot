@@ -202,7 +202,17 @@ class Recorder:
         if not self.streaming_enabled:
             self.streaming_queue = queue.Queue(maxsize=100)
             self.streaming_enabled = True
-            self.logger.info('Streaming enabled')
+            
+            # Send any audio already in audio2send to the streaming queue (includes prev_audio)
+            if self.audio2send:
+                self.logger.info(f'Streaming enabled with {len(self.audio2send)} prev audio chunks')
+                for chunk in self.audio2send:
+                    try:
+                        self.streaming_queue.put_nowait(chunk)
+                    except queue.Full:
+                        self.logger.warning('Streaming queue full while adding audio2send, dropping chunk')
+            else:
+                self.logger.info('Streaming enabled')
     
     def disable_streaming(self):
         # Disable streaming mode
