@@ -194,6 +194,7 @@ class Recorder:
     
     def destroy(self):
         self.stop()
+        self.disable_streaming()  # Clean up streaming queue if enabled
         self.p.terminate()
 
 
