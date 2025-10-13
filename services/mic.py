@@ -9,7 +9,7 @@ from silero_vad import get_speech_timestamps, load_silero_vad
 
 class Recorder:
     def __init__(self, callback, chunk_size=2048, format=pyaudio.paInt16,
-                 channels=1, rate=16000, prev_audio_size=2.5) -> None:
+                 channels=1, rate=16000, prev_audio_size=2.5, silence_duration=0.5) -> None:
         self.logger = logging.getLogger('Mic')
         self.logger.setLevel(logging.DEBUG)
 
@@ -41,6 +41,10 @@ class Recorder:
         self.process_every_n = 2  # Process every N chunks to reduce CPU load
         self.chunk_counter = 0
         self.min_buffer_size = int(rate / chunk_size * 0.5)  # Minimum 0.5 seconds for VAD processing
+        
+        # Silence detection tracking
+        self.silence_chunks_needed = int(silence_duration * rate / chunk_size)  # Number of consecutive unvoiced chunks needed
+        self.silence_chunk_counter = 0  # Counter for consecutive unvoiced chunks
 
         # Streaming attributes
         self.streaming_enabled = False
@@ -90,6 +94,9 @@ class Recorder:
                         except queue.Full:
                             self.logger.warning('Streaming queue full while adding prev_audio, dropping chunk')
             
+            # Reset silence counter when speech is detected
+            self.silence_chunk_counter = 0
+            
             self.audio2send.append(in_data)
             
             # If streaming is enabled, send chunks to streaming queue
@@ -100,18 +107,34 @@ class Recorder:
                     self.logger.warning('Streaming queue full, dropping chunk')
 
         elif self.start_recording.is_set(): # Silence detected after voice activity
-            self.start_recording.clear()
-            self.stop_recording.set()
+            # Increment silence counter
+            self.silence_chunk_counter += 1
             
-            # Signal end of streaming
+            # Continue appending audio during silence period
+            self.audio2send.append(in_data)
+            
+            # If streaming is enabled, send chunks to streaming queue
             if self.streaming_enabled and self.streaming_queue is not None:
                 try:
-                    self.streaming_queue.put_nowait(None)  # Sentinel value
+                    self.streaming_queue.put_nowait(in_data)
                 except queue.Full:
-                    pass
+                    self.logger.warning('Streaming queue full, dropping chunk')
             
-            self.prev_audio = deque(maxlen=int(self.prev_audio_size * self.rate/self.chunk_size)) 
-            return (in_data, pyaudio.paComplete)
+            # Only stop if we have reached the required silence duration
+            if self.silence_chunk_counter >= self.silence_chunks_needed:
+                self.start_recording.clear()
+                self.stop_recording.set()
+                self.silence_chunk_counter = 0  # Reset counter
+                
+                # Signal end of streaming
+                if self.streaming_enabled and self.streaming_queue is not None:
+                    try:
+                        self.streaming_queue.put_nowait(None)  # Stop value
+                    except queue.Full:
+                        pass
+                
+                self.prev_audio = deque(maxlen=int(self.prev_audio_size * self.rate/self.chunk_size)) 
+                return (in_data, pyaudio.paComplete)
             
         else:
             self.prev_audio.append(in_data)
