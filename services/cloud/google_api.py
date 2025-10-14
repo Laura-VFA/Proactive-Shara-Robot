@@ -18,21 +18,33 @@ tts_config = texttospeech.AudioConfig(
 
 # STT 
 clientSTT = speech.SpeechClient()
+
+# STT Config (non-streaming) - used as fallback
 stt_config = speech.RecognitionConfig(
     encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
     sample_rate_hertz=16000,
     language_code="es-ES",
-    enable_automatic_punctuation=True
+    enable_automatic_punctuation=True,
+    model="latest_short"  # Good for both long and short utterances
 )
+
+# STT Streaming config - uses latest_long (optimized for conversations)
 streaming_config = speech.StreamingRecognitionConfig(
-    config=stt_config,
-    interim_results=True  # Get interim results while speaking
+    config=speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+        sample_rate_hertz=16000,
+        language_code="es-ES",
+        enable_automatic_punctuation=True,
+        model="latest_long"
+    ),
+    interim_results=True
 )
 
 
 def speech_to_text(audio_bytes):
     """
-    Converts speech audio to text (non streaming)
+    Converts speech audio to text (non-streaming, synchronous).
+    Uses latest_short model which works well for short utterances.
     
     Args:
         audio_bytes (bytes): The audio content to transcribe
@@ -62,26 +74,48 @@ def create_streaming_stt_request_generator(audio_generator):
     Args:
         audio_generator: Generator that yields audio chunks (bytes)
     
-    Returns:
-        Generator of StreamingRecognizeRequest objects
+    Yields:
+        StreamingRecognizeRequest objects
     """
     for audio_chunk in audio_generator:
         yield speech.StreamingRecognizeRequest(audio_content=audio_chunk)
 
 
-def streaming_speech_to_text(audio_generator):
+def create_streaming_requests_with_collection(audio_generator):
     """
-    Performs streaming speech recognition on audio chunks.
+    Creates streaming requests while collecting audio for fallback.
     
     Args:
         audio_generator: Generator that yields audio chunks (bytes)
     
     Returns:
-        tuple: (transcript, silence_detection_time) where silence_detection_time is the time 
-               from when the last interim result was received to when final transcript was available
+        tuple: (request_generator, collected_audio_list)
     """
+    collected = []
     
-    requests = create_streaming_stt_request_generator(audio_generator)
+    def gen():
+        for audio_chunk in audio_generator:
+            collected.append(audio_chunk)
+            yield speech.StreamingRecognizeRequest(audio_content=audio_chunk)
+    
+    return gen(), collected
+
+
+def streaming_speech_to_text(audio_generator):
+    """
+    Core streaming STT function. Pure streaming logic without fallback.
+    
+    Args:
+        audio_generator: Generator that yields audio chunks (bytes)
+    
+    Returns:
+        tuple: (transcript, silence_detection_time, audio_bytes) where:
+            - transcript: The transcribed text from streaming
+            - silence_detection_time: Time from last interim to final result
+            - audio_bytes: Collected audio for potential fallback
+    """
+    # Create requests and collect audio for potential fallback
+    requests, collected_audio = create_streaming_requests_with_collection(audio_generator)
     responses = clientSTT.streaming_recognize(streaming_config, requests)
     
     transcript = ""
@@ -115,9 +149,8 @@ def streaming_speech_to_text(audio_generator):
                 
                 # If final transcript is empty but we had interim results, use the last interim
                 # Only do this if we had multiple interim results (more confidence)
-                if not transcript and last_interim_transcript:
-                    if interim_count >= 2:
-                        transcript = last_interim_transcript
+                if not transcript and last_interim_transcript and interim_count >= 2:
+                    transcript = last_interim_transcript
 
                 break  # We got the final result
     
@@ -127,4 +160,45 @@ def streaming_speech_to_text(audio_generator):
         if not transcript and last_interim_transcript and interim_count >= 2:
             transcript = last_interim_transcript
     
-    return transcript, silence_detection_time
+    audio_bytes = b''.join(collected_audio) if collected_audio else b''
+    return transcript, silence_detection_time, audio_bytes
+
+
+def compose_streaming_fallback_speech_to_text(audio_generator):
+    """
+    Performs streaming speech recognition with automatic fallback for empty results.
+    
+    Strategy:
+    1. Try streaming STT with latest_long model (optimized for conversations)
+    2. If result is empty, fallback to latest_short model (better for monosyllables)
+    
+    Args:
+        audio_generator: Generator that yields audio chunks (bytes)
+    
+    Returns:
+        tuple: (transcript, silence_detection_time) where:
+            - transcript: The transcribed text
+            - silence_detection_time: Total time including fallback if used
+    """
+    # Step 1: Try streaming STT
+    transcript, silence_time, audio_bytes = streaming_speech_to_text(audio_generator)
+    
+    # Step 2: Fallback if result is empty
+    if not transcript and audio_bytes:
+        try:
+            fallback_start = time.time()
+            fallback_transcript = speech_to_text(audio_bytes)
+            fallback_time = time.time() - fallback_start
+            
+            if fallback_transcript:
+                transcript = fallback_transcript
+                # Add fallback time to total time
+                if silence_time is not None:
+                    silence_time += fallback_time
+                else:
+                    silence_time = fallback_time
+        except Exception:
+            # Fallback failed, keep original transcript
+            pass
+    
+    return transcript, silence_time
