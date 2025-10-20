@@ -122,7 +122,6 @@ def streaming_speech_to_text(audio_generator):
     silence_detection_time = None
     last_interim_time = None
     last_interim_transcript = ""  # Store last interim result as fallback
-    interim_count = 0
     
     try:
         for response in responses:
@@ -133,7 +132,6 @@ def streaming_speech_to_text(audio_generator):
             
             if not result.is_final:
                 # Update the time of the last interim result (user still speaking)
-                interim_count += 1
                 last_interim_transcript = result.alternatives[0].transcript  # Save interim transcript
                 last_interim_time = time.time()
             else:
@@ -148,8 +146,7 @@ def streaming_speech_to_text(audio_generator):
                     silence_detection_time = 0.0
                 
                 # If final transcript is empty but we had interim results, use the last interim
-                # Only do this if we had multiple interim results (more confidence)
-                if not transcript and last_interim_transcript and interim_count >= 2:
+                if not transcript and last_interim_transcript:
                     transcript = last_interim_transcript
 
                 break  # We got the final result
@@ -157,7 +154,7 @@ def streaming_speech_to_text(audio_generator):
     except Exception as e:
         # If the stream ends or there's an error, return what we have
         # Use last interim result if available
-        if not transcript and last_interim_transcript and interim_count >= 2:
+        if not transcript and last_interim_transcript:
             transcript = last_interim_transcript
     
     audio_bytes = b''.join(collected_audio) if collected_audio else b''
