@@ -67,7 +67,7 @@ def wf_event_handler(event, usernames=None):
 
                 proactive.update('sensor', 'close_face_recognized', args={'username': robot_context['username']})
 
-        elif None in usernames and usernames[None] >= 15: # Detect 15 unknown in a row
+        elif None in usernames and usernames[None] >= 8: # Detect 8 unknown in a row
             proactive.update('sensor', 'unknown_face')
 
 def rf_event_handler(event, progress=None):
