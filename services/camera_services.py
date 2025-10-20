@@ -197,8 +197,8 @@ class Wakeface(CameraService):
             if not bboxes:
                 face_history.clear()
 
-            # Execute recognizer until a face is recognized 3 times or None at least 15 times
-            elif not face_history or all((count < 3 if name is not None else count < 15) for name, count in face_history.items()):
+            # Execute recognizer until a face is recognized 3 times or None at least 8 times
+            elif not face_history or all((count < 3 if name is not None else count < 8) for name, count in face_history.items()):
                 names = set(self.recognize(frame, bboxes)) # Remove duplicates
                 face_history = {name: face_history.get(name, 0) + 1 for name in names} # Names counter
                 self.callback('face_recognized', usernames=face_history)
