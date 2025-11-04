@@ -38,8 +38,15 @@ class ProactiveService:
                 
             elif subtype == 'close_face_recognized':
                 # Timeout, ask 'How are you? to specific user'
-                if (self.next_close_face_question_time[args['username']] - datetime.now()).total_seconds() <= 0: 
-                    self.callback('ask_how_are_you', {'type': 'close_face_recognized', 'username': args['username']})
+                username = args.get('username')
+                if username:
+                    # Si el usuario no existe en el diccionario, inicializarlo
+                    if username not in self.next_close_face_question_time:
+                        self.next_close_face_question_time[username] = datetime.now()
+                        self.logger.info(f"New user detected: {username}. Timer initialized at {self.next_close_face_question_time[username]}")
+                    
+                    if (self.next_close_face_question_time[username] - datetime.now()).total_seconds() <= 0: 
+                        self.callback('ask_how_are_you', {'type': 'close_face_recognized', 'username': username})
 
             elif subtype == 'unknown_face': # Ask new user's name
                 self.callback('ask_who_are_you')
@@ -51,9 +58,10 @@ class ProactiveService:
                 self.next_presence_question_time = datetime.now() + timedelta(hours=2)
                 self.logger.info(f"Next how_are_you - presence timer set at {self.next_presence_question_time}")
 
-                if args['username']: # Set new alarm for close face (specific user) 30 minute later
-                    self.next_close_face_question_time[args['username']] = datetime.now() + timedelta(minutes=30)
-                    self.logger.info(f"Next how_are_you - close_face_recognized ({args['username']}) set at {self.next_close_face_question_time}")
+                username = args.get('username')
+                if username: # Set new alarm for close face (specific user) 30 minute later
+                    self.next_close_face_question_time[username] = datetime.now() + timedelta(minutes=30)
+                    self.logger.info(f"Next how_are_you - close_face_recognized ({username}) set at {self.next_close_face_question_time}")
                 
                 else: # Postpone all the known users alarms 10 minutes later (just in case the user doesn't want to talk after presece proactive question and the user is still there)
                     self.logger.info(f"Postponing all the known users alarms 10 minutes later")
@@ -70,5 +78,7 @@ class ProactiveService:
                 pass
             
             elif subtype == 'recorded_face': # add new user to the list of users (proactive question alarm)
-                self.next_close_face_question_time[args['username']] = datetime.now() + timedelta(minutes=30)
-                self.logger.info(f"Added {args['username']} to proactive alarm, set at {self.next_close_face_question_time[args['username']]}")
+                username = args.get('username')
+                if username:
+                    self.next_close_face_question_time[username] = datetime.now() + timedelta(minutes=30)
+                    self.logger.info(f"Added {username} to proactive alarm, set at {self.next_close_face_question_time[username]}")
