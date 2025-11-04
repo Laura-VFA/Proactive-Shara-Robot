@@ -40,7 +40,7 @@ class ProactiveService:
                 # Timeout, ask 'How are you? to specific user'
                 username = args.get('username')
                 if username:
-                    # Si el usuario no existe en el diccionario, inicializarlo
+                    # If user does not exist, initialize it
                     if username not in self.next_close_face_question_time:
                         self.next_close_face_question_time[username] = datetime.now()
                         self.logger.info(f"New user detected: {username}. Timer initialized at {self.next_close_face_question_time[username]}")
