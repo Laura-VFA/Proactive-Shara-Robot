@@ -183,7 +183,7 @@ def generate_response(input_text, context_data={}):
     except json.JSONDecodeError:
         robot_context = {}
 
-    response_text = robot_context.pop("response", "").translate(str.maketrans('', '', '*_#'))
+    response_text = robot_context.pop("response", "").translate(str.maketrans("'", '"', '*_#'))
     robot_context = robot_context | robot_action
 
     return response_text, robot_context
