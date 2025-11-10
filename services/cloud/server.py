@@ -58,6 +58,10 @@ def query(request: Request):
     logger.info(f'Response text :: {text_response}')
     logger.info(f'Response context :: {robot_context}')
 
+    # Check if LLM response text robot is empty
+    if not text_response:
+        return None
+
     # TTS
     start_time = time.time()
     audio_response = text_to_speech(text_response)
@@ -93,6 +97,10 @@ def query_with_text(request: Request):
     logger.info(f'LLM response generated in {time.time() - start_time:.2f} seconds')
     logger.info(f'Response text :: {text_response}')
     logger.info(f'Response context :: {robot_context}')
+
+    # Check if LLM response text robot is empty
+    if not text_response:
+        return None
 
     # TTS
     start_time = time.time()
