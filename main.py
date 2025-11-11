@@ -296,11 +296,11 @@ def process_transition(transition, params={}):
                                 robot_context['username'] = response.username
                                 rf.start(response.username)
                                 proactive.update('confirm', 'recorded_face', {'username': response.username})
-                                
+
                                 # Load previous conversation history for this user if exists (just for error, false unknown faces that were actually known)
                                 try:
                                     server.load_conversation_db(robot_context['username'])
-                                    logger.warning(f'{robot_context['username']} -- This user was already known and stored in user database')
+                                    logger.warning(f"{robot_context['username']} -- This user was already known and stored in user database")
                                 except Exception as e:
                                     logger.warning(f'Could not load conversation history after recording face. {str(e)}')
                             
