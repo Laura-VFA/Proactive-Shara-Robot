@@ -481,6 +481,7 @@ def process_transition(transition, params={}):
                 else: # Asked question
                     robot_context['continue_conversation'] = True
                     robot_context['state'] = 'speaking'
+                    eyes.set(response.robot_mood)
                     leds.set(LedState.breath((52,158,235))) # light blue led breath animation
                     speaker.start(response.audio)
 
@@ -528,6 +529,7 @@ def process_transition(transition, params={}):
                     robot_context['proactive_question'] = 'who_are_you_response'
                     robot_context['continue_conversation'] = True
                     robot_context['state'] = 'speaking'
+                    eyes.set(response.robot_mood)
                     leds.set(LedState.breath((52,158,235))) # light blue led breath animation
                     speaker.start(response.audio)
                     try:
