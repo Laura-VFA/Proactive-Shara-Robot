@@ -43,7 +43,7 @@ class TouchScreen:
         def trigger_event():
             nonlocal hold_timer
             if len(active_touches) == 3:
-                self.logger.info("Three (3) fingers hold during 3 seconds. Triggering shutdown event")
+                self.logger.info("Three (3) fingers hold during 2 seconds. Triggering shutdown event")
                 self.callback('shutdown') # Genetare a interrupt to main thread
             hold_timer = None
 
@@ -81,8 +81,8 @@ class TouchScreen:
                                     
                                     # Start timer when we reach exactly 3 fingers
                                     if len(active_touches) == 3 and hold_timer is None:
-                                        self.logger.info("Three fingers detected - starting 3 second timer")
-                                        hold_timer = Timer(3, trigger_event)
+                                        self.logger.info("Three fingers detected - starting 2 second timer")
+                                        hold_timer = Timer(2, trigger_event)
                                         hold_timer.start()
     
         except Exception as e:
