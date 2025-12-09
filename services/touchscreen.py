@@ -37,7 +37,7 @@ class TouchScreen:
         self.logger.info("Started")
 
         active_touches = {} # Active touches by slot (fingers)
-        current_slot = None  # Will be set by first ABS_MT_SLOT event
+        current_slot = 0  # Default to slot 0 (MT Protocol B spec: slot 0 is implicit if not specified)
         hold_timer = None # Timer for holding fingers
 
         def trigger_event():
@@ -58,10 +58,6 @@ class TouchScreen:
                                 current_slot = event.value
 
                             elif event.code == ecodes.ABS_MT_TRACKING_ID:
-                                if current_slot is None:
-                                    self.logger.debug("Skipping event - slot not yet initialized")
-                                    continue  # Skip if slot not set
-                                    
                                 if event.value == -1:
                                     # Remove touch since finger was lifted
                                     if current_slot in active_touches:
