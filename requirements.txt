@@ -84,7 +84,7 @@ numpy==1.26.4
 oauthlib==3.2.2
 olefile==0.46
 onnxruntime==1.20.1
-openai==1.60.2
+openai==2.11.0
 opencv-python==4.10.0.84
 opt_einsum==3.4.0
 optree==0.14.1
