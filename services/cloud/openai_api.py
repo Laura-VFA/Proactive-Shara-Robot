@@ -1,7 +1,6 @@
 import json
 from datetime import datetime
 from openai import OpenAI  
-from pydantic import BaseModel, Field
 
 client = OpenAI()
 
@@ -78,21 +77,13 @@ def clear_conversation_history():
 shara_prompt = load_prompt()
 tools = load_tools()
 
-
-# JSON Schema for response format
-class ResponseFormat(BaseModel):
-    continue_conversation: bool = Field(alias="continue")
-    robot_mood: str
-    response: str
-
 # OpenAI completion arguments configuration
 completion_args = {
     "model": "gpt-4o-mini",
-    "text_format": ResponseFormat,
+    "response_format": {'type': "json_object"},
+    "store": True,
     "temperature": 1,
-    "top_p": 1,
-    "instructions": shara_prompt,
-    "truncation": "auto" # Truncate messages automatically if they exceed the model's context length
+    "top_p": 1
 }
 
 
@@ -100,8 +91,8 @@ completion_args = {
 def handle_tool_call(tool_call, context_data):
     ''' Tool (functions) calling handler. Process tool calls and return the result and robot action if needed '''
 
-    tool_name = tool_call.name
-    args = json.loads(tool_call.arguments)
+    tool_name = tool_call.function.name
+    args = json.loads(tool_call.function.arguments)
 
     result = ''
     robot_action = {}
@@ -128,7 +119,7 @@ def handle_tool_call(tool_call, context_data):
 def build_messages(input_text, context_data):
     ''' Build messages with conversation history '''
 
-    messages = prev_conversation_history + current_conversation_history # include previous conversation history
+    messages = [{"role": "developer", "content": shara_prompt}] + prev_conversation_history + current_conversation_history # include previous conversation history
     user_message = {"role": "user", "content": json.dumps({**context_data,
                                                            "user_input": input_text,
                                                            "timestamp": datetime.now().strftime("%d-%m-%Y %H:%M")}, ensure_ascii=False)}
@@ -144,63 +135,55 @@ def get_tools_for_context(context_data):
     # Filter who_are_you proactive question (avoid unnecessary record_face tool)
     pq = context_data.get("proactive_question", None)
     tools_to_use = []
-    requireness = None
 
     if pq == "who_are_you_response":
-        tools_to_use = [t for t in tools if t["name"] == "record_face"]
-        requireness = "required"
+        tools_to_use = [t for t in tools if t["function"]["name"] == "record_face"]
     
     elif pq == "casual_ask_known_username":
-        tools_to_use = [t for t in tools if t["name"] == "set_username"]
-        requireness = "auto"
+        tools_to_use = [t for t in tools if t["function"]["name"] == "set_username"]
 
-    return tools_to_use, requireness
+    return tools_to_use
 
 
 def generate_response(input_text, context_data={}):
     ''' Generate response from user input, context data, and conversation history '''
     
     messages = build_messages(input_text, context_data)
-    tools_to_use, requireness_tool = get_tools_for_context(context_data)
+    tools_to_use = get_tools_for_context(context_data)
 
     # Create OpenAI completion arguments
-    completion_args["input"] = messages
+    completion_args["messages"] = messages
     if tools_to_use:  # Only add 'tools' if there are tools available
         completion_args["tools"] = tools_to_use
-        completion_args["tool_choice"] = requireness_tool
 
     robot_action = {}
-    response = client.responses.parse(**completion_args)
+    response = client.chat.completions.create(**completion_args)
 
-    # Check if there is a function call in the list of response.output
-    if any(item.type == "function_call" for item in response.output):
-        tool_call = next(item for item in response.output if item.type == "function_call")
+    if response.choices[0].message.tool_calls:
+        tool_call = response.choices[0].message.tool_calls[0]
         result, robot_action = handle_tool_call(tool_call, context_data)
 
-        messages.append(tool_call) # append model's function call message
-        messages.append({                   # append function result message
-            "type": "function_call_output",
-            "call_id": tool_call.call_id,
-            "output": result
+        messages.append(response.choices[0].message)  # append model's function call message
+        messages.append({                               # append result message
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": result
         })
 
-        completion_args.pop("tool_choice", None)  # Remove tools
-        completion_args.pop("tools", None)
+        response = client.chat.completions.create(**completion_args)
+    
+    # Extract response text from OpenAI response
+    response_text = response.choices[0].message.content
 
-        response = client.responses.parse(**completion_args)
-    
-    # Get response dict from OpenAI response
-    response_dict = response.output_parsed.model_dump(by_alias=True)
-    
-    response_text = response_dict.get("response", "").translate(str.maketrans("'", '"', '*_#'))
-    
     # Add response to conversation history
     current_conversation_history.append({"role": "assistant", "content": response_text})
 
-    # Build robot_context from parsed data (continue, robot_mood, robot_action)
-    robot_context = {
-        "continue": response_dict.get("continue", False),
-        "robot_mood": response_dict.get("robot_mood", "neutral"),
-    } | robot_action
-    
+    try:
+        robot_context = json.loads(response_text)
+    except json.JSONDecodeError:
+        robot_context = {}
+
+    response_text = robot_context.pop("response", "").translate(str.maketrans("'", '"', '*_#'))
+    robot_context = robot_context | robot_action
+
     return response_text, robot_context
